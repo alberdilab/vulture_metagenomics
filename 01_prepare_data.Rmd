@@ -118,7 +118,7 @@ save(sample_metadata,
      genome_counts, 
      genome_counts_filt, 
      genome_tree,
-    #genome_gifts, 
+     genome_gifts, 
      phylum_colors,
      file = "data/data.Rdata")
 ```
