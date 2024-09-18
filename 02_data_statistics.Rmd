@@ -37,6 +37,7 @@ sequence_fractions %>%
 
 
 ```{r dna_fractions_plot, message=FALSE, warning=FALSE, fig.height=6, fig.width=10, fig.fullwidth=TRUE}
+#Fractions of DNA that are low quality, host, unmapped, or mags
 sequence_fractions %>%
 	pivot_longer(!sample, names_to = "fraction", values_to = "value") %>%
 	mutate(value = value / 1000000000) %>%
@@ -55,6 +56,8 @@ sequence_fractions %>%
 ## Recovered microbial fraction
 
 ```{r data_estimations_plot, message=FALSE, warning=FALSE, fig.height=12, fig.width=10, fig.fullwidth=TRUE}
+#Fraction of DNA that was recovered vs expected separated by species and sample type
+
 singlem_table <- sequence_fractions %>%
 	mutate(mags_proportion = round((mags_bases / (mags_bases + unmapped_bases))*100,2)) %>%
 	left_join(sample_metadata, by = join_by(sample == sample))  %>%

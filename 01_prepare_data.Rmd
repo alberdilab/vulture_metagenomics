@@ -1,3 +1,42 @@
+```{r packages, warning=FALSE, comments="", message=FALSE}
+# Base
+library(R.utils)
+library(knitr)
+library(tidyverse)
+library(devtools)
+library(tinytable)
+library(rairtable)
+
+# For tree handling
+library(ape)
+library(phyloseq)
+library(phytools)
+
+# For plotting
+library(ggplot2)
+library(ggrepel)
+library(ggpubr)
+library(ggnewscale)
+library(gridExtra)
+library(ggtreeExtra)
+library(ggtree)
+library(ggh4x)
+
+# For statistics
+library(spaa)
+library(vegan)
+library(Rtsne)
+library(geiger)
+library(hilldiv)
+library(distill)
+library(ANCOMBC)
+library(lme4)
+
+library(distillery)
+library(hilldiv2)
+library(distillR)
+```
+
 # Prepare data
 
 ## Load data
@@ -9,6 +48,12 @@ Load the original data files outputted by the bioinformatic pipeline.
 ```{r load_sample_metadata, warning=FALSE, comments="", message=FALSE}
 sample_metadata <- read_tsv("data/DMB0117_metadata.tsv.gz") %>%
     rename(sample=1)
+individuals = read.csv("vulture_individuals.csv")
+
+#Add State data
+sample_metadata$state = substr(word(sample_metadata$region),1,nchar(word(sample_metadata$region))-1)
+#Join sample number with metadata
+sample_metadata = left_join(sample_metadata, individuals, by = "sample")
 ```
 
 ### Read counts
@@ -43,16 +88,16 @@ genome_tree <- keep.tip(genome_tree, tip=genome_metadata$genome) # keep only MAG
 
 Downloading individual annotation files from ERDA using information in Airtable and writing them to a single compressed table takes a while. The following chunk only needs to be run once, to generate the ***genome_annotations*** table that is saved in the data directory. Note that the airtable connection requires a personal access token. 
 
-```{r download_genome_annotations, warning=FALSE, comments="", message=FALSE, eval=FALSE}
-airtable("MAGs", "appWbHBNLE6iAsMRV") %>% #get base ID from Airtable browser URL
-  read_airtable(., fields = c("ID","mag_name","number_genes","anno_url"), id_to_col = TRUE) %>% #get 3 columns from MAGs table
-  filter(mag_name %in% paste0(genome_metadata$genome,".fa")) %>% #filter by MAG name
-  filter(number_genes > 0) %>% #genes need to exist
-  select(anno_url) %>% #list MAG annotation urls
-  pull() %>%
-  read_tsv() %>% #load all tables
-  rename(gene=1, genome=2, contig=3) %>% #rename first 3 columns
-  write_tsv(file="data/genome_annotations.tsv.xz") #write to overall compressed file
+```{r download_genome_annotations, eval=FALSE, message=FALSE, warning=FALSE, comments=""}
+ airtable("MAGs", "appWbHBNLE6iAsMRV") %>% #get base ID from Airtable browser URL
+   read_airtable(., fields = c("ID","mag_name","number_genes","anno_url"), id_to_col = TRUE) %>% #get 3 columns from MAGs table
+   filter(mag_name %in% paste0(genome_metadata$genome,".fa")) %>% #filter by MAG name
+   filter(number_genes > 0) %>% #genes need to exist
+   select(anno_url) %>% #list MAG annotation urls
+   pull() %>%
+   read_tsv() %>% #load all tables
+   rename(gene=1, genome=2, contig=3) %>% #rename first 3 columns
+   write_tsv(file="data/genome_annotations.tsv.xz") #write to overall compressed file
 ```
 
 ```{r load_genome_annotations, warning=FALSE, comments="", message=FALSE}
@@ -98,13 +143,25 @@ genome_gifts <- distill(genome_annotations,GIFT_db,genomecol=2,annotcol=c(9,10,1
 [AlberdiLab](www.alberdilab.dk) projects use unified color schemes developed for the [Earth Hologenome Initiative](www.earthhologenome.org), to facilitate figure interpretation.
 
 ```{r get_ehi_colors, warning=FALSE, comments="", message=FALSE}
-phylum_colors <- read_tsv("https://raw.githubusercontent.com/earthhologenome/EHI_taxonomy_colour/main/ehi_phylum_colors.tsv") %>%
+colors = read_tsv("https://raw.githubusercontent.com/earthhologenome/EHI_taxonomy_colour/main/ehi_phylum_colors.tsv")
+#Put colorblind friendly colors and non overlapping colors into the EHI colors
+colors[match(c("p__Actinomycetota", "p__Bacillota", "p__Bacillota_A", "p__Bacillota_B", "p__Bacillota_C", "p__Bacteroidota", "p__Campylobacterota", "p__Chlamydiota", "p__Deferribacterota", "p__Desulfobacterota", "p__Fusobacteriota", "p__Pseudomonadota"), colors$phylum), 2] = c("#c8c8c8", "#f0c571", "#59a89c", "#d47264", "#e25759", "#9d2c00", "#7E4794", "#36b700", "#00317e", "#008dff", "#c701ff", "#0d0d0d")
+phylum_colors <- colors %>%
     right_join(genome_metadata, by=join_by(phylum == phylum)) %>%
     arrange(match(genome, genome_tree$tip.label)) %>%
     select(phylum, colors) %>% 
     unique() %>%
     arrange(phylum) %>%
     pull(colors, name=phylum)
+#picking new color blind friendly and non overlapping colors for phyla
+#phylum_colors[]=c("#c8c8c8", "#f0c571", "#59a89c", "#d47264", "#e25759", "#9d2c00", "#7E4794", "#36b700", "#00317e", "#008dff", "#c701ff", "#0d0d0d")
+
+#Colors for samples
+species_colors = c("#d83034", "#0d0d0d")
+sampletype_colors = c("#f45f74", "#008dff")
+sex_colors = c("#bdd373", "#003a7d")
+state_colors = c("#ff8ca1", "#f45f74")
+
 ```
 
 ## Wrap working objects
