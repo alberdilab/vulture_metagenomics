@@ -1,41 +1,4 @@
-```{r packages, warning=FALSE, comments="", message=FALSE}
-# Base
-library(R.utils)
-library(knitr)
-library(tidyverse)
-library(devtools)
-library(tinytable)
-library(rairtable)
 
-# For tree handling
-library(ape)
-library(phyloseq)
-library(phytools)
-
-# For plotting
-library(ggplot2)
-library(ggrepel)
-library(ggpubr)
-library(ggnewscale)
-library(gridExtra)
-library(ggtreeExtra)
-library(ggtree)
-library(ggh4x)
-
-# For statistics
-library(spaa)
-library(vegan)
-library(Rtsne)
-library(geiger)
-library(hilldiv)
-library(distill)
-library(ANCOMBC)
-library(lme4)
-
-library(distillery)
-library(hilldiv2)
-library(distillR)
-```
 
 # Prepare data
 
@@ -54,6 +17,7 @@ individuals = read.csv("vulture_individuals.csv")
 sample_metadata$state = substr(word(sample_metadata$region),1,nchar(word(sample_metadata$region))-1)
 #Join sample number with metadata
 sample_metadata = left_join(sample_metadata, individuals, by = "sample")
+
 ```
 
 ### Read counts
@@ -131,6 +95,9 @@ readlength=150
 genome_counts_filt <- read_counts_filt %>%
   mutate(across(where(is.numeric), ~ . / (genome_metadata$length / readlength) ))
 ```
+
+
+
 
 ### Distill annotations into GIFTs 
 

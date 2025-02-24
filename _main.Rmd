@@ -83,44 +83,7 @@ library(lme4)
 
 <!--chapter:end:index.Rmd-->
 
-```{r packages, warning=FALSE, comments="", message=FALSE}
-# Base
-library(R.utils)
-library(knitr)
-library(tidyverse)
-library(devtools)
-library(tinytable)
-library(rairtable)
 
-# For tree handling
-library(ape)
-library(phyloseq)
-library(phytools)
-
-# For plotting
-library(ggplot2)
-library(ggrepel)
-library(ggpubr)
-library(ggnewscale)
-library(gridExtra)
-library(ggtreeExtra)
-library(ggtree)
-library(ggh4x)
-
-# For statistics
-library(spaa)
-library(vegan)
-library(Rtsne)
-library(geiger)
-library(hilldiv)
-library(distill)
-library(ANCOMBC)
-library(lme4)
-
-library(distillery)
-library(hilldiv2)
-library(distillR)
-```
 
 # Prepare data
 
@@ -139,6 +102,7 @@ individuals = read.csv("vulture_individuals.csv")
 sample_metadata$state = substr(word(sample_metadata$region),1,nchar(word(sample_metadata$region))-1)
 #Join sample number with metadata
 sample_metadata = left_join(sample_metadata, individuals, by = "sample")
+
 ```
 
 ### Read counts
@@ -146,6 +110,7 @@ sample_metadata = left_join(sample_metadata, individuals, by = "sample")
 ```{r load_read_counts, warning=FALSE, comments="", message=FALSE}
 read_counts <- read_tsv("data/DMB0117_counts.tsv.gz") %>%
     rename(genome=1)
+read_counts
 ```
 
 ### Genome base hits
@@ -153,6 +118,7 @@ read_counts <- read_tsv("data/DMB0117_counts.tsv.gz") %>%
 ```{r load_genome_hits, warning=FALSE, comments="", message=FALSE}
 genome_coverage <- read_tsv("data/DMB0117_coverage.tsv.gz") %>%
     rename(genome=1)
+genome_coverage
 ```
 
 ### Genome taxonomy
@@ -216,6 +182,7 @@ readlength=150
 genome_counts_filt <- read_counts_filt %>%
   mutate(across(where(is.numeric), ~ . / (genome_metadata$length / readlength) ))
 ```
+
 
 ### Distill annotations into GIFTs 
 
@@ -570,19 +537,6 @@ function_ordination <- tSNE_function$Y %>%
 function_ordination
 ```
 
-## Functional level
-
-```{r}
-GIFTs_functions_community %>%
-    as.data.frame() %>%
-    rownames_to_column(var="sample") %>%
-    pivot_longer(!sample,names_to="trait",values_to="gift") %>%
-    left_join(sample_metadata, by = join_by(sample == sample)) %>%
-    ggplot(aes(x=trait,y=sample,fill=gift)) +
-        geom_tile(colour="white", size=0.2)+
-        scale_fill_gradientn(colours=rev(c("#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#e6f598", "#abdda4", "#ddf1da")))+
-        facet_grid(type ~ ., scales="free",space="free")
-```
 
 <!--chapter:end:03_mag_catalogue.Rmd-->
 
@@ -799,6 +753,7 @@ alpha_div %>%
 ## Beta diversity
 
 ```{r beta_div, comment="", message=FALSE, warning=FALSE}
+
 beta_q0n <- genome_counts_filt %>%
   column_to_rownames(., "genome") %>%
   filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
@@ -823,8 +778,18 @@ beta_q1f <- genome_counts_filt %>%
   hillpair(., q = 1, dist = dist)
 ```
 
+```{r remove_0_count_metadata, warning=FALSE, comments="", message=FALSE}
+genome_counts_non0 = genome_counts_filt %>%
+  column_to_rownames(., "genome") %>%
+  filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
+  select_if(~!all(. == 0))
+
+sample_metadata_non0 = sample_metadata[na.omit(match(sample_metadata$sample, colnames(genome_counts_non0))),]
+  
+```
+
 ## Richness diversity plot (Species and Sample Type)
-```{r}
+```{r rich_div_species_sample, warning=FALSE, comments="", message=FALSE}
 beta_q0n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
@@ -835,7 +800,7 @@ beta_q0n$S %>%
   mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
   mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
   ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = sample_type, fill = sample_type, #shape = as.factor(sample_type)
+  ggplot(aes(x = NMDS1, y = NMDS2, color = species,  shape = as.factor(sample_type)
              )) +
   geom_point(size = 4) +
   scale_color_manual(values = sampletype_colors) +
@@ -848,12 +813,17 @@ beta_q0n$S %>%
     legend.text = element_text(size = 10),
     legend.title = element_text(size = 12),
     legend.position = "right", legend.box = "vertical"
-    )
-#+ labs(shape="Sample Type")
+    ) + 
+    labs(shape="Sample Type") +
+    labs(color="Species")
 #+geom_text_repel(aes(label = sample), size=3)
+
+#Richness
+betadisper(beta_q0n$C, sample_metadata_non0$sample_type) %>% permutest(., pairwise = TRUE) 
+betadisper(beta_q0n$C, sample_metadata_non0$species) %>% permutest(., pairwise = TRUE) 
 ```
 ## Richness diversity plot (Sex and State)
-```{r}
+```{r rich_div_sex_state, warning=FALSE, comments="", message=FALSE}
 beta_q0n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
@@ -878,9 +848,11 @@ beta_q0n$S %>%
     ) +
     labs(shape="State")
 #+geom_text_repel(aes(label = sample), size=3)
+betadisper(beta_q0n$C, sample_metadata_non0$sex) %>% permutest(., pairwise = TRUE) 
+betadisper(beta_q0n$C, sample_metadata_non0$state) %>% permutest(., pairwise = TRUE) 
 ```
-#Neutral Diversity (Species and Sample Type)
-``` {r}
+##Neutral Diversity (Species and Sample Type)
+``` {r neutral_div_species_sample, warning=FALSE, comments="", message=FALSE}
 beta_q1n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
@@ -890,7 +862,7 @@ beta_q1n$S %>%
   mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
   mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
   ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = sample_type, fill = sample_type, #shape = as.factor(sample_type)
+  ggplot(aes(x = NMDS1, y = NMDS2, color = sample_type, fill = sample_type, shape = as.factor(sample_type)
              )) +
   geom_point(size = 4) +
   scale_color_manual(values = sampletype_colors)+
@@ -905,10 +877,12 @@ beta_q1n$S %>%
     legend.position = "right", legend.box = "vertical"
     ) 
 #+ labs(shape="Sample Type")
+betadisper(beta_q1n$C, sample_metadata_non0$species) %>% permutest(., pairwise = TRUE) 
+betadisper(beta_q1n$C, sample_metadata_non0$sample_type) %>% permutest(., pairwise = TRUE) 
 ```
 
-#Neutral Diversity (Sex and State)
-``` {r}
+##Neutral Diversity (Sex and State)
+``` {r neutral_div_sex_state, warning=FALSE, comments="", message=FALSE}
 beta_q1n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
@@ -931,11 +905,15 @@ beta_q1n$S %>%
     legend.title = element_text(size = 12),
     legend.position = "right", legend.box = "vertical"
     ) +
-    labs(shape="State")
+    labs(shape="State") + 
+    labs(color="Species")
+
+betadisper(beta_q1n$C, sample_metadata_non0$sex) %>% permutest(., pairwise = TRUE) 
+betadisper(beta_q1n$C, sample_metadata_non0$state) %>% permutest(., pairwise = TRUE) 
 ```
 
-#Functional Diversity (Species)
-``` {r}
+##Functional Diversity (Species and State)
+``` {r function_div_species_state, warning=FALSE, comments="", message=FALSE}
 beta_q1f$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
@@ -945,7 +923,7 @@ beta_q1f$S %>%
   mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
   mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
   ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = species, fill = species, #shape = as.factor(sample_type)
+  ggplot(aes(x = NMDS1, y = NMDS2, color = species, fill = species, shape = as.factor(sample_type)
              )) +
   geom_point(size = 4) +
   scale_color_manual(values = species_colors) +
@@ -958,16 +936,17 @@ beta_q1f$S %>%
     legend.text = element_text(size = 10),
     legend.title = element_text(size = 12),
     legend.position = "right", legend.box = "vertical"
-    )
-    #+ labs(shape="Sample Type")
+    ) + 
+  labs(shape="Sample Type") + 
+  labs(color="State")
 #+geom_text_repel(aes(label = sample), size=3)
 
 #pcoa = cmdscale(beta_q1f$S, eig = TRUE)
 #ordiplot(pcoa)
 ```
 
-#Functional Diversity (Sex and State)
-``` {r}
+##Functional Diversity (State)
+``` {r function_div_state, warning=FALSE, comments="", message=FALSE}
 beta_q1f$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
@@ -1037,31 +1016,37 @@ GIFTs_functions_community %>%
 
 ## GIFT test
 ``` {r}
-GIFTs_functions_community_tt <- GIFTs_functions_community %>%
-  as.data.frame() %>%
-  rownames_to_column("sample") %>%
-  separate(sample, into = c("individual", "sample_type"), sep = "\\.") %>%
-  pivot_longer(-c(individual, sample_type), names_to = "trait", values_to = "value") %>%
-  group_by(trait) %>%
-  mutate(model_result = list(lmerTest::lmer(value ~ sample_type + (1 | individual)))) %>%
-  ungroup() %>%
-  select(trait,model_result) %>%
-  unique() %>%
-  mutate(estimate = map_dbl(model_result, ~broom.mixed::tidy(.) %>% filter(term == "typefeces") %>% pull(estimate))) %>%
-
-  mutate(p_value = map_dbl(model_result, ~broom.mixed::tidy(.) %>% filter(term == "typefeces") %>% pull(p.value))) %>%
-  mutate(p_value_adj = p.adjust(p_value, method = "bonferroni")) %>%
-  left_join(GIFT_db %>% select(Code_function,Function) %>% unique(),by=join_by(trait==Code_function)) %>%
-  rename(id=trait,trait=Function) %>%
-  select(id,trait, estimate, p_value_adj)
-
-GIFTs_functions_community_tt %>% tt() |> 
-      style_tt(
-        i = which(GIFTs_functions_community_tt$estimate < 0 & GIFTs_functions_community_tt$p_value_adj < 0.05),
-        background = "#E5D5B1") |> 
-      style_tt(
-        i = which(GIFTs_functions_community_tt$estimate > 0 & GIFTs_functions_community_tt$p_value_adj < 0.05),
-        background = "#B7BCCE")
+## Some errors with lmer
+#! number of levels of each grouping factor must be < number of observations (problems: individual)
+# GIFTs_functions_community_tt <- GIFTs_functions_community %>%
+#   as.data.frame() %>%
+#   rownames_to_column("sample") %>%
+#   separate(sample, into = c("individual", "sample_type"), sep = "\\.") 
+# 
+# GIFTs_functions_community_tt$sample_type = sample_metadata$sample_type[match(GIFTs_functions_community_tt$individual, sample_metadata$sample)]
+# 
+# GIFTs_functions_community_tt %>%
+#   pivot_longer(-c(individual, sample_type), names_to = "trait", values_to = "value") %>%
+#   group_by(trait) %>%
+#   mutate(model_result = list(lmerTest::lmer(value ~ sample_type + (1 | individual)))) %>%
+#   ungroup() %>%
+#   select(trait,model_result) %>%
+#   unique() %>%
+#   mutate(estimate = map_dbl(model_result, ~broom.mixed::tidy(.) %>% filter(term == "typefeces") %>% pull(estimate))) %>%
+# 
+#   mutate(p_value = map_dbl(model_result, ~broom.mixed::tidy(.) %>% filter(term == "typefeces") %>% pull(p.value))) %>%
+#   mutate(p_value_adj = p.adjust(p_value, method = "bonferroni")) %>%
+#   left_join(GIFT_db %>% select(Code_function,Function) %>% unique(),by=join_by(trait==Code_function)) %>%
+#   rename(id=trait,trait=Function) %>%
+#   select(id,trait, estimate, p_value_adj)
+# 
+# GIFTs_functions_community_tt %>% tt() |> 
+#       style_tt(
+#         i = which(GIFTs_functions_community_tt$estimate < 0 & GIFTs_functions_community_tt$p_value_adj < 0.05),
+#         background = "#E5D5B1") |> 
+#       style_tt(
+#         i = which(GIFTs_functions_community_tt$estimate > 0 & GIFTs_functions_community_tt$p_value_adj < 0.05),
+#         background = "#B7BCCE")
 ```
 
 ##Element Level
