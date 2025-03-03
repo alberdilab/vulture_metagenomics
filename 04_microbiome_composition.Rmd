@@ -29,6 +29,58 @@ genome_counts_filt %>%
           #legend.position = "none",
           strip.background.x=element_rect(color = NA, fill= "#f4f4f4"))
 ```
+### Taxonomy barplot per individual by host
+
+```{r barplot_individuals_host, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
+genome_counts_filt %>%
+  mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS nornalisation
+  pivot_longer(-genome, names_to = "sample", values_to = "count") %>% #reduce to minimum number of columns
+  left_join(., genome_metadata, by = join_by(genome == genome)) %>% #append genome metadata
+  left_join(., sample_metadata, by = join_by(sample == sample)) %>% #append sample metadata
+  filter(!is.na(count)) %>%
+  ggplot(aes(y=count,x=sample, fill=phylum, group=phylum)) + #grouping enables keeping the same sorting of taxonomic units
+    geom_bar(stat="identity", colour="white", linewidth=0.1) + #plot stacked bars with white borders
+    scale_fill_manual(values=phylum_colors) +
+    labs(x = "Relative abundance", y ="Samples") +
+    facet_nested(. ~ species.y,  scales="free", space="free") + #facet per day and treatment
+    scale_y_continuous(expand = c(0.001, 0.001)) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          axis.title.x = element_blank(),
+          panel.background = element_blank(),
+          panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          axis.line = element_line(linewidth = 0.5, linetype = "solid", colour = "black"),
+          #legend.position = "none",
+          strip.background.x=element_rect(color = NA, fill= "#f4f4f4"))
+```
+
+### Taxonomy barplot per individual by sample type
+
+```{r barplot_individuals_sampletype, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
+genome_counts_filt %>%
+  mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS nornalisation
+  pivot_longer(-genome, names_to = "sample", values_to = "count") %>% #reduce to minimum number of columns
+  left_join(., genome_metadata, by = join_by(genome == genome)) %>% #append genome metadata
+  left_join(., sample_metadata, by = join_by(sample == sample)) %>% #append sample metadata
+  filter(!is.na(count)) %>%
+  ggplot(aes(y=count,x=sample, fill=phylum, group=phylum)) + #grouping enables keeping the same sorting of taxonomic units
+    geom_bar(stat="identity", colour="white", linewidth=0.1) + #plot stacked bars with white borders
+    scale_fill_manual(values=phylum_colors) +
+    labs(x = "Relative abundance", y ="Samples") +
+    facet_nested(. ~ sample_type ,  scales="free", space="free") + #facet per day and treatment
+    scale_y_continuous(expand = c(0.001, 0.001)) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          axis.title.x = element_blank(),
+          panel.background = element_blank(),
+          panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          axis.line = element_line(linewidth = 0.5, linetype = "solid", colour = "black"),
+          #legend.position = "none",
+          strip.background.x=element_rect(color = NA, fill= "#f4f4f4"))
+```
+
 
 ## Taxonomy boxplot
 
@@ -246,19 +298,60 @@ sample_metadata_non0 = sample_metadata[na.omit(match(sample_metadata$sample, col
   
 ```
 
-## Richness diversity plot (Species and Sample Type)
-```{r rich_div_species_sample, warning=FALSE, comments="", message=FALSE}
+## Richness diversity plot (Species)
+```{r rich_div_species, warning=FALSE, comments="", message=FALSE}
 beta_q0n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
   as_tibble(., rownames = "sample") %>%
   dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(sample_type,#, sample_type
+  group_by(species #, sample_type
            ) %>%
   mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
   mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
   ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = species,  shape = as.factor(sample_type)
+  ggplot(aes(x = NMDS1, y = NMDS2, color = species,  #shape = as.factor(sample_type)
+             )) +
+  geom_point(size = 4) +
+  scale_color_manual(values = species_colors) +
+  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    ) + 
+    #labs(shape="Sample Type") +
+    labs(color="Species")
+#+geom_text_repel(aes(label = sample), size=3)
+
+#Richness
+#betadisper(beta_q0n$C, sample_metadata_non0$sample_type) %>% permutest(., pairwise = TRUE) 
+betadisper(beta_q0n$C, sample_metadata_non0$species) %>% permutest(., pairwise = TRUE) 
+
+
+adonis2(beta_q0n$S ~ species, 
+        data = sample_metadata_non0 %>% arrange(match(sample,labels(beta_q0n$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+```
+## Richness diversity plot (Sample Type)
+```{r rich_div_sample, warning=FALSE, comments="", message=FALSE}
+beta_q0n$S %>%
+  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
+  vegan::scores() %>%
+  as_tibble(., rownames = "sample") %>%
+  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
+  group_by(sample_type #, species
+           ) %>%
+  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
+  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
+  ungroup() %>%
+  ggplot(aes(x = NMDS1, y = NMDS2, color = sample_type,  #shape = as.factor(species)
              )) +
   geom_point(size = 4) +
   scale_color_manual(values = sampletype_colors) +
@@ -272,26 +365,34 @@ beta_q0n$S %>%
     legend.title = element_text(size = 12),
     legend.position = "right", legend.box = "vertical"
     ) + 
-    labs(shape="Sample Type") +
-    labs(color="Species")
+    #labs(shape="Species") +
+    labs(color="Sample Type")
 #+geom_text_repel(aes(label = sample), size=3)
 
 #Richness
+#betadisper(beta_q0n$C, sample_metadata_non0$sample_type) %>% permutest(., pairwise = TRUE) 
 betadisper(beta_q0n$C, sample_metadata_non0$sample_type) %>% permutest(., pairwise = TRUE) 
-betadisper(beta_q0n$C, sample_metadata_non0$species) %>% permutest(., pairwise = TRUE) 
+
+
+adonis2(beta_q0n$S ~ sample_type, 
+        data = sample_metadata_non0 %>% arrange(match(sample,labels(beta_q0n$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
 ```
-## Richness diversity plot (Sex and State)
-```{r rich_div_sex_state, warning=FALSE, comments="", message=FALSE}
+## Richness diversity plot (Sex)
+```{r rich_div_sex, warning=FALSE, comments="", message=FALSE}
 beta_q0n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
   as_tibble(., rownames = "sample") %>%
   dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(sex, state) %>%
+  group_by(sex) %>%
   mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
   mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
   ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = sex, fill = sex, shape = as.factor(state))) +
+  ggplot(aes(x = NMDS1, y = NMDS2, color = sex #, fill = sex, shape = as.factor(state)
+             )) +
   geom_point(size = 4) +
   scale_color_manual(values = sex_colors) +
   geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
@@ -304,13 +405,94 @@ beta_q0n$S %>%
     legend.title = element_text(size = 12),
     legend.position = "right", legend.box = "vertical"
     ) +
-    labs(shape="State")
+    #labs(shape="State") +
+    labs(color="Sex")
 #+geom_text_repel(aes(label = sample), size=3)
+#Calculate dispersion and significance
 betadisper(beta_q0n$C, sample_metadata_non0$sex) %>% permutest(., pairwise = TRUE) 
-betadisper(beta_q0n$C, sample_metadata_non0$state) %>% permutest(., pairwise = TRUE) 
+#betadisper(beta_q0n$C, sample_metadata_non0$state) %>% permutest(., pairwise = TRUE) 
+adonis2(beta_q0n$S ~ sex, 
+        data = sample_metadata_non0 %>% arrange(match(sample,labels(beta_q0n$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
 ```
-##Neutral Diversity (Species and Sample Type)
-``` {r neutral_div_species_sample, warning=FALSE, comments="", message=FALSE}
+## Richness diversity plot (State)
+```{r rich_div_state, warning=FALSE, comments="", message=FALSE}
+beta_q0n$S %>%
+  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
+  vegan::scores() %>%
+  as_tibble(., rownames = "sample") %>%
+  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
+  group_by(state) %>%
+  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
+  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
+  ungroup() %>%
+  ggplot(aes(x = NMDS1, y = NMDS2, color = state # shape = as.factor(sex)
+             )) +
+  geom_point(size = 4) +
+  scale_color_manual(values = state_colors) +
+  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    ) +
+    #labs(shape="Sex") +
+    labs(color="State")
+#+geom_text_repel(aes(label = sample), size=3)
+#Calculate dispersion and significance
+betadisper(beta_q0n$C, sample_metadata_non0$state) %>% permutest(., pairwise = TRUE) 
+#betadisper(beta_q0n$C, sample_metadata_non0$state) %>% permutest(., pairwise = TRUE) 
+adonis2(beta_q0n$S ~ state, 
+        data = sample_metadata_non0 %>% arrange(match(sample,labels(beta_q0n$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+```
+##Neutral Diversity (Species)
+``` {r neutral_div_species, warning=FALSE, comments="", message=FALSE}
+beta_q1n$S %>%
+  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
+  vegan::scores() %>%
+  as_tibble(., rownames = "sample") %>%
+  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
+  group_by(species) %>%
+  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
+  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
+  ungroup() %>%
+  ggplot(aes(x = NMDS1, y = NMDS2, color = species#, fill = sample_type, shape = as.factor(sample_type)
+             )) +
+  geom_point(size = 4) +
+  scale_color_manual(values = species_colors)+
+  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    ) 
+#+ labs(shape="Sample Type")
+betadisper(beta_q1n$S, sample_metadata_non0$species) %>% permutest(., pairwise = TRUE) 
+#betadisper(beta_q1n$C, sample_metadata_non0$sample_type) %>% permutest(., pairwise = TRUE) 
+
+adonis2(beta_q1n$S ~ species, 
+        data = sample_metadata_non0 %>% arrange(match(sample,labels(beta_q1n$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+
+
+```
+##Neutral Diversity (Sample Type)
+``` {r neutral_div_sample, warning=FALSE, comments="", message=FALSE}
 beta_q1n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
@@ -320,7 +502,7 @@ beta_q1n$S %>%
   mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
   mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
   ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = sample_type, fill = sample_type, shape = as.factor(sample_type)
+  ggplot(aes(x = NMDS1, y = NMDS2, color = sample_type#, fill = sample_type, shape = as.factor(sample_type)
              )) +
   geom_point(size = 4) +
   scale_color_manual(values = sampletype_colors)+
@@ -335,22 +517,31 @@ beta_q1n$S %>%
     legend.position = "right", legend.box = "vertical"
     ) 
 #+ labs(shape="Sample Type")
-betadisper(beta_q1n$C, sample_metadata_non0$species) %>% permutest(., pairwise = TRUE) 
+#betadisper(beta_q1n$S, sample_metadata_non0$species) %>% permutest(., pairwise = TRUE) 
 betadisper(beta_q1n$C, sample_metadata_non0$sample_type) %>% permutest(., pairwise = TRUE) 
+
+adonis2(beta_q1n$S ~ sample_type, 
+        data = sample_metadata_non0 %>% arrange(match(sample,labels(beta_q1n$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+
+
 ```
 
-##Neutral Diversity (Sex and State)
-``` {r neutral_div_sex_state, warning=FALSE, comments="", message=FALSE}
+##Neutral Diversity (Sex)
+``` {r neutral_div_sex, warning=FALSE, comments="", message=FALSE}
 beta_q1n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
   as_tibble(., rownames = "sample") %>%
   dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(sex, state) %>%
+  group_by(sex) %>%
   mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
   mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
   ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = sex, fill = sex, shape = as.factor(state))) +
+  ggplot(aes(x = NMDS1, y = NMDS2, color = sex#, shape = as.factor(state)
+             )) +
   geom_point(size = 4) +
   scale_color_manual(values = sex_colors)+
   geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
@@ -363,11 +554,52 @@ beta_q1n$S %>%
     legend.title = element_text(size = 12),
     legend.position = "right", legend.box = "vertical"
     ) +
-    labs(shape="State") + 
-    labs(color="Species")
+    #labs(shape="State") + 
+    labs(color="Sex")
 
 betadisper(beta_q1n$C, sample_metadata_non0$sex) %>% permutest(., pairwise = TRUE) 
+
+adonis2(beta_q1n$S ~ sex, 
+        data = sample_metadata_non0 %>% arrange(match(sample,labels(beta_q1n$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+```
+##Neutral Diversity (State)
+``` {r neutral_div_state, warning=FALSE, comments="", message=FALSE}
+beta_q1n$S %>%
+  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
+  vegan::scores() %>%
+  as_tibble(., rownames = "sample") %>%
+  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
+  group_by(state) %>%
+  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
+  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
+  ungroup() %>%
+  ggplot(aes(x = NMDS1, y = NMDS2, color = state#, shape = as.factor(state)
+             )) +
+  geom_point(size = 4) +
+  scale_color_manual(values = state_colors)+
+  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    ) +
+    #labs(shape="State") + 
+    labs(color="State")
+
 betadisper(beta_q1n$C, sample_metadata_non0$state) %>% permutest(., pairwise = TRUE) 
+
+adonis2(beta_q1n$S ~ state, 
+        data = sample_metadata_non0 %>% arrange(match(sample,labels(beta_q1n$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
 ```
 
 ##Functional Diversity (Species and State)
@@ -432,7 +664,7 @@ beta_q1f$S %>%
 ```
 
 ## Functional Differences
-```{r warning=FALSE}
+```{r calculate_gift warning=FALSE}
 # Aggregate bundle-level GIFTs into the compound level
 GIFTs_elements <- to.elements(genome_gifts, GIFT_db)
 GIFTs_elements_filtered <- GIFTs_elements[rownames(GIFTs_elements) %in% genome_counts$genome, ]
@@ -460,7 +692,7 @@ GIFTs_domains_community <- to.community(GIFTs_domains, genome_counts_filt %>% co
 ```
 
 ## Functional Level
-```{r}
+```{r functional_level_gift}
 GIFTs_functions_community_no0 <- GIFTs_functions_community[rowSums(GIFTs_functions_community[])>0,]
 
 GIFTs_functions_community_no0 %>%
@@ -510,7 +742,7 @@ GIFTs_functions_community_no0 %>%
 ```
 
 ## Element Level
-```{r fig.height=10, fig.width=10, fig.fullwidth=TRUE}
+```{r element_level_gift fig.height=10, fig.width=10, fig.fullwidth=TRUE}
 #Filter out samples with only 0 GIFT scores
 GIFTs_elements_community_no0 <- GIFTs_elements_community[rowSums(GIFTs_elements_community[])>0,]
 
@@ -544,7 +776,7 @@ as.data.frame(GIFTs_elements_community_no0) %>%
 ```
 
 ## Element Level Individual functions
-```{r Individual_factor_element, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
+```{r individual_factor_element, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
 
 #Change column in GIFT_db to focus on specific genetic function
 GIFT_interest = GIFT_db[which(GIFT_db$Function == "Amino acid derivative biosynthesis"),]
@@ -579,29 +811,54 @@ as.data.frame(GIFTs_elements_community_no0) %>%
 ```
 ```{r Function_Distance_Matrix }
 dist_func = vegdist(GIFTs_elements_community_no0, method ="bray" )
-test <- adonis2(dist_func ~ sample_metadata_non0$sample_type, data = as.data.frame(GIFTs_elements_community_no0), permutations = 999)
-print(test)
-
+adonis2(dist_func ~ sample_metadata_non0$species, 
+        data = as.data.frame(GIFTs_elements_community_no0) %>% arrange(match(sample_metadata_non0$sample,labels(beta_q1n$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
 betadisper(dist_func, sample_metadata_non0$sample_type) %>% permutest()
 
-GIFTs_elements_community_no0 %>%
-    as.data.frame() %>%
-    rownames_to_column(var="sample") %>%
-    pivot_longer(!sample,names_to="trait",values_to="gift") %>%
-    left_join(sample_metadata_non0, by = join_by(sample == sample)) %>%
-as.data.frame(GIFTs_elements_community_no0) %>%
-    mutate(functionid = substr(trait, 1, 3)) %>%
-    mutate(trait = case_when(
-      trait %in% GIFT_interest$Code_element ~ GIFT_interest$Element[match(trait, GIFT_interest$Code_element)],
-      TRUE ~ trait
-    )) %>%
-    mutate(functionid = case_when(
-      functionid %in% GIFT_interest$Code_function ~ GIFT_interest$Function[match(functionid, GIFT_interest$Code_function)],
-      TRUE ~ functionid
-    )) %>%
-    mutate(trait=factor(trait,levels=unique(GIFT_interest$Element))) %>%
-    mutate(functionid=factor(functionid,levels=unique(GIFT_interest$Function)))
+set.seed(123)
+nmds_result <- metaMDS(dist_func, k = 2, trymax = 100)
+nmds_scores <- as.data.frame(nmds_result$points)
 
+#GIFT ordination by sample type
+nmds_scores$Group <- sample_metadata_non0$sample_type
+
+x_cen = mean(nmds_scores$MDS1, na.rm = TRUE)
+y_cen = mean(nmds_scores$MDS2, na.rm = TRUE)
+ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
+  geom_point(size = 4) +
+  scale_color_manual(values = sampletype_colors) +
+  geom_segment(aes(x = x_cen, y = y_cen, xend = MDS1, yend = MDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    )
+
+#GIFT ordination by species
+nmds_scores$Group <- sample_metadata_non0$species
+
+x_cen = mean(nmds_scores$MDS1, na.rm = TRUE)
+y_cen = mean(nmds_scores$MDS2, na.rm = TRUE)
+ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
+  geom_point(size = 4) +
+  scale_color_manual(values = species_colors) +
+  geom_segment(aes(x = x_cen, y = y_cen, xend = MDS1, yend = MDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    )
 
 
 ```

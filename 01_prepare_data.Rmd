@@ -127,7 +127,7 @@ phylum_colors <- colors %>%
 species_colors = c("#d83034", "#0d0d0d")
 sampletype_colors = c("#f45f74", "#008dff")
 sex_colors = c("#bdd373", "#003a7d")
-state_colors = c("#ff8ca1", "#f45f74")
+state_colors = c("#D55E00", "#CC79A7")
 
 ```
 
