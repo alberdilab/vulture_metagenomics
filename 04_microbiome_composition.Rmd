@@ -699,7 +699,7 @@ GIFTs_functions_community_no0 %>%
     as.data.frame() %>%
     rownames_to_column(var="sample") %>%
     pivot_longer(!sample,names_to="trait",values_to="gift") %>%
-    left_join(sample_metadata_non0, by = join_by(sample == sample)) %>%
+    left_join(sample_metadata, by = join_by(sample == sample)) %>%
     ggplot(aes(x=trait,y=sample,fill=gift)) +
         geom_tile(colour="white", linewidth=0.2)+
         scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed")))+
@@ -750,7 +750,7 @@ GIFTs_elements_community_no0 %>%
     as.data.frame() %>%
     rownames_to_column(var="sample") %>%
     pivot_longer(!sample,names_to="trait",values_to="gift") %>%
-    left_join(sample_metadata_non0, by = join_by(sample == sample)) %>%
+    left_join(sample_metadata, by = join_by(sample == sample)) %>%
 as.data.frame(GIFTs_elements_community_no0) %>%
     mutate(functionid = substr(trait, 1, 3)) %>%
     mutate(trait = case_when(
@@ -785,7 +785,7 @@ GIFTs_elements_community_no0 %>%
     as.data.frame() %>%
     rownames_to_column(var="sample") %>%
     pivot_longer(!sample,names_to="trait",values_to="gift") %>%
-    left_join(sample_metadata_non0, by = join_by(sample == sample)) %>%
+    left_join(sample_metadata, by = join_by(sample == sample)) %>%
 as.data.frame(GIFTs_elements_community_no0) %>%
     mutate(functionid = substr(trait, 1, 3)) %>%
     mutate(trait = case_when(
@@ -802,7 +802,7 @@ as.data.frame(GIFTs_elements_community_no0) %>%
         geom_tile(colour="white", linewidth=0.2)+
         scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) + 
         #facet_nested(~ species + sample_type,  scales="free", space="free") + 
-        facet_grid(functionid ~ sample_type, scales="free",space="free") +
+        facet_grid(~ sample_type, scales="free",space="free") +
         theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1),
               strip.text.y = element_text(angle = 90), axis.text.y = element_text(angle=45, size=5)) + 
         labs(y="Functional Attribute",x="Samples",fill="GIFT")
@@ -860,5 +860,50 @@ ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
     legend.position = "right", legend.box = "vertical"
     )
 
+
+```
+```{r ancom_gift }
+
+elements_table_ps <- otu_table(as.matrix(t(GIFTs_elements_community_no0)), taxa_are_rows = TRUE)
+
+# Convert metadata to phyloseq sample_data object
+sample_data_ps <- sample_data(column_to_rownames(sample_metadata, "sample"))
+
+# Combine into phyloseq object
+ancom_table <- phyloseq(elements_table_ps, sample_data_ps)
+
+# Example metadata with sample IDs and a grouping variable
+# metadata <- data.frame(sample_id = colnames(otu_table), group = c("A", "A", "B", "B", ...))
+
+
+
+exp <- ancombc2(
+    data = ancom_table,
+    fix_formula = "sample_type",   
+    p_adj_method = "holm",
+    prv_cut = 0.1,           
+    lib_cut = 20,          
+    group = "sample_type",          
+    struc_zero = TRUE,
+    neg_lb = TRUE,
+    alpha = 0.05,
+    global = TRUE,
+    n_cl = 1,
+    verbose = TRUE
+)
+
+# View results
+lfc_df <- cbind(exp$res$`lfc_sample_typeStomach contents`)
+
+#Identify differentially expressed genes
+lfc_df <- as.data.frame(exp$res$'lfc_sample_typeStomach contents') %>%
+  tibble::rownames_to_column(var = "taxon")
+
+
+# See significant taxa
+sig_taxa <- lfc_df %>%
+  dplyr::filter(`q_sample_typeStomach contents` < 0.05)
+
+print(sig_taxa)
 
 ```
