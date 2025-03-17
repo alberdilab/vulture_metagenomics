@@ -210,7 +210,7 @@ phylogenetic <- genome_counts_filt %>%
 
 # Aggregate basal GIFT into elements
 dist <- genome_gifts %>%
-  to.elements(., GIFT_db) %>%
+  to.elements(., GIFT_db2) %>%
   traits2dist(., method = "gower")
 
 functional <- genome_counts_filt %>%
@@ -244,11 +244,11 @@ alpha_div %>%
       scale_color_manual(name="Group",
           breaks=c("Cathartes aura_Colon contents","Coragyps atratus_Colon contents","Cathartes aura_Stomach contents","Coragyps atratus_Stomach contents"),
           labels=c("Cathartes aura (colon)","Coragyps atratus (colon)","Cathartes aura (stomach)","Coragyps atratus (stomach)"),
-          values=c("#00b0be50", "#ffb25550","#8fd7d750", "#ffcd8e50")) +
+          values=c(species_colors, "#FF6A6A", "#8B8989" )) +
       scale_fill_manual(name="Group",
           breaks=c("Cathartes aura_Colon contents","Coragyps atratus_Colon contents","Cathartes aura_Stomach contents","Coragyps atratus_Stomach contents"),
           labels=c("Cathartes aura (colon)","Coragyps atratus (colon)","Cathartes aura (stomach)","Coragyps atratus (stomach)"),
-          values=c("#00b0be", "#ffb255","#8fd7d7", "#ffcd8e")) +
+          values=c(species_colors, "#FF6A6A", "#8B8989" )) +
       facet_wrap(. ~ metric, scales = "free", ncol=4) +
       coord_cartesian(xlim = c(1, NA)) +
       theme_classic() +
@@ -603,7 +603,7 @@ adonis2(beta_q1n$S ~ state,
 ```
 
 ##Functional Diversity (Species and State)
-``` {r function_div_species_state, warning=FALSE, comments="", message=FALSE}
+``` {r function_div_species_state, warning=FALSE, comments="", message=FALSE, echo=FALSE}
 beta_q1f$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
@@ -636,7 +636,7 @@ beta_q1f$S %>%
 ```
 
 ##Functional Diversity (State)
-``` {r function_div_state, warning=FALSE, comments="", message=FALSE}
+``` {r function_div_state, warning=FALSE, comments="", message=FALSE, echo=FALSE}
 beta_q1f$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
@@ -664,9 +664,9 @@ beta_q1f$S %>%
 ```
 
 ## Functional Differences
-```{r calculate_gift warning=FALSE}
+```{r calculate_gift, warning=FALSE}
 # Aggregate bundle-level GIFTs into the compound level
-GIFTs_elements <- to.elements(genome_gifts, GIFT_db)
+GIFTs_elements <- to.elements(genome_gifts, GIFT_db2)
 GIFTs_elements_filtered <- GIFTs_elements[rownames(GIFTs_elements) %in% genome_counts$genome, ]
 GIFTs_elements_filtered <- as.data.frame(GIFTs_elements_filtered) %>%
   select_if(~ !is.numeric(.) || sum(.) != 0)
@@ -675,19 +675,19 @@ elements <- GIFTs_elements_filtered %>%
   as.data.frame()
 
 # Aggregate element-level GIFTs into the function level
-GIFTs_functions <- to.functions(GIFTs_elements_filtered, GIFT_db)
+GIFTs_functions <- to.functions(GIFTs_elements_filtered, GIFT_db2)
 functions <- GIFTs_functions %>%
   as.data.frame()
 
 # Aggregate function-level GIFTs into overall Biosynthesis, Degradation and Structural GIFTs
-GIFTs_domains <- to.domains(GIFTs_functions, GIFT_db)
+GIFTs_domains <- to.domains(GIFTs_functions, GIFT_db2)
 domains <- GIFTs_domains %>%
   as.data.frame()
 
 # Get community-weighed average GIFTs per sample
-GIFTs_elements_community <- to.community(GIFTs_elements_filtered, genome_counts_filt %>% column_to_rownames(., "genome") %>% tss(), GIFT_db)
-GIFTs_functions_community <- to.community(GIFTs_functions, genome_counts_filt %>% column_to_rownames(., "genome") %>% tss(), GIFT_db)
-GIFTs_domains_community <- to.community(GIFTs_domains, genome_counts_filt %>% column_to_rownames(., "genome") %>% tss(), GIFT_db)
+GIFTs_elements_community <- to.community(GIFTs_elements_filtered, genome_counts_filt %>% column_to_rownames(., "genome") %>% tss(), GIFT_db2)
+GIFTs_functions_community <- to.community(GIFTs_functions, genome_counts_filt %>% column_to_rownames(., "genome") %>% tss(), GIFT_db2)
+GIFTs_domains_community <- to.community(GIFTs_domains, genome_counts_filt %>% column_to_rownames(., "genome") %>% tss(), GIFT_db2)
 
 ```
 
@@ -728,7 +728,7 @@ GIFTs_functions_community_no0 %>%
 # 
 #   mutate(p_value = map_dbl(model_result, ~broom.mixed::tidy(.) %>% filter(term == "typefeces") %>% pull(p.value))) %>%
 #   mutate(p_value_adj = p.adjust(p_value, method = "bonferroni")) %>%
-#   left_join(GIFT_db %>% select(Code_function,Function) %>% unique(),by=join_by(trait==Code_function)) %>%
+#   left_join(GIFT_db2 %>% select(Code_function,Function) %>% unique(),by=join_by(trait==Code_function)) %>%
 #   rename(id=trait,trait=Function) %>%
 #   select(id,trait, estimate, p_value_adj)
 # 
@@ -742,7 +742,7 @@ GIFTs_functions_community_no0 %>%
 ```
 
 ## Element Level
-```{r element_level_gift fig.height=10, fig.width=10, fig.fullwidth=TRUE}
+```{r element_level_gift, fig.height=15, fig.width=10, fig.fullwidth=TRUE}
 #Filter out samples with only 0 GIFT scores
 GIFTs_elements_community_no0 <- GIFTs_elements_community[rowSums(GIFTs_elements_community[])>0,]
 
@@ -754,15 +754,15 @@ GIFTs_elements_community_no0 %>%
 as.data.frame(GIFTs_elements_community_no0) %>%
     mutate(functionid = substr(trait, 1, 3)) %>%
     mutate(trait = case_when(
-      trait %in% GIFT_db$Code_element ~ GIFT_db$Element[match(trait, GIFT_db$Code_element)],
+      trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait, GIFT_db2$Code_element)],
       TRUE ~ trait
     )) %>%
     mutate(functionid = case_when(
-      functionid %in% GIFT_db$Code_function ~ GIFT_db$Function[match(functionid, GIFT_db$Code_function)],
+      functionid %in% GIFT_db2$Code_function ~ GIFT_db2$Function[match(functionid, GIFT_db2$Code_function)],
       TRUE ~ functionid
     )) %>%
-    mutate(trait=factor(trait,levels=unique(GIFT_db$Element))) %>%
-    mutate(functionid=factor(functionid,levels=unique(GIFT_db$Function))) %>%
+    mutate(trait=factor(trait,levels=unique(GIFT_db2$Element))) %>%
+    mutate(functionid=factor(functionid,levels=unique(GIFT_db2$Function))) %>%
     ggplot(aes(x=sample,y=trait,fill=gift)) +
         geom_tile(colour="white", linewidth=0.2)+
         scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) + 
@@ -778,8 +778,8 @@ as.data.frame(GIFTs_elements_community_no0) %>%
 ## Element Level Individual functions
 ```{r individual_factor_element, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
 
-#Change column in GIFT_db to focus on specific genetic function
-GIFT_interest = GIFT_db[which(GIFT_db$Function == "Amino acid derivative biosynthesis"),]
+#Change column in GIFT_db2 to focus on specific genetic function
+GIFT_interest = GIFT_db2[which(GIFT_db2$Function == "Amino acid derivative biosynthesis"),]
 
 GIFTs_elements_community_no0 %>%
     as.data.frame() %>%
@@ -862,7 +862,8 @@ ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
 
 
 ```
-```{r ancom_gift }
+###Identify Significant functions by Sample Type
+```{r ancom_gift_sampletype}
 
 elements_table_ps <- otu_table(as.matrix(t(GIFTs_elements_community_no0)), taxa_are_rows = TRUE)
 
@@ -872,12 +873,7 @@ sample_data_ps <- sample_data(column_to_rownames(sample_metadata, "sample"))
 # Combine into phyloseq object
 ancom_table <- phyloseq(elements_table_ps, sample_data_ps)
 
-# Example metadata with sample IDs and a grouping variable
-# metadata <- data.frame(sample_id = colnames(otu_table), group = c("A", "A", "B", "B", ...))
-
-
-
-exp <- ancombc2(
+exp_sampletype <- ancombc2(
     data = ancom_table,
     fix_formula = "sample_type",   
     p_adj_method = "holm",
@@ -893,17 +889,276 @@ exp <- ancombc2(
 )
 
 # View results
-lfc_df <- cbind(exp$res$`lfc_sample_typeStomach contents`)
-
-#Identify differentially expressed genes
-lfc_df <- as.data.frame(exp$res$'lfc_sample_typeStomach contents') %>%
-  tibble::rownames_to_column(var = "taxon")
-
+lfc_sampletype <- as.data.frame(exp_sampletype$res$taxon)
+colnames(lfc_sampletype)[1] = "Function"
+rownames(lfc_sampletype) = lfc_sampletype$Function
+lfc_sampletype$Function = NULL
+lfc_sampletype = mutate(lfc_sampletype, lfc = exp_sampletype$res$`lfc_sample_typeStomach contents`)
+lfc_sampletype = mutate(lfc_sampletype, q_val = exp_sampletype$res$`q_sample_typeStomach contents`)
 
 # See significant taxa
-sig_taxa <- lfc_df %>%
-  dplyr::filter(`q_sample_typeStomach contents` < 0.05)
+sig_func_sampletype = filter(lfc_sampletype, q_val < 0.05)
 
-print(sig_taxa)
+print(sig_func_sampletype)
+
+```
+
+
+```{r GIFT_sig_sampletype, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
+#Match significant functions to table
+GIFTs_elements_community_no0_sig = GIFTs_elements_community_no0[, which(match(colnames(GIFTs_elements_community_no0), rownames(sig_func_sampletype))>0)]
+
+GIFTs_elements_community_no0_sig %>%
+    as.data.frame() %>%
+    rownames_to_column(var="sample") %>%
+    pivot_longer(!sample,names_to="trait",values_to="gift") %>%
+    left_join(sample_metadata, by = join_by(sample == sample)) %>%
+as.data.frame(GIFTs_elements_community_no0_sig) %>%
+    mutate(functionid = substr(trait, 1, 3)) %>%
+    mutate(trait = case_when(
+      trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait, GIFT_db2$Code_element)],
+      TRUE ~ trait
+    )) %>%
+    mutate(functionid = case_when(
+      functionid %in% GIFT_db2$Code_function ~ GIFT_db2$Function[match(functionid, GIFT_db2$Code_function)],
+      TRUE ~ functionid
+    )) %>%
+    mutate(trait=factor(trait,levels=unique(GIFT_db2$Element))) %>%
+    mutate(functionid=factor(functionid,levels=unique(GIFT_db2$Function))) %>%
+    ggplot(aes(x=sample,y=trait,fill=gift)) +
+        geom_tile(colour="white", linewidth=0.2)+
+        scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) + 
+        #facet_nested(~ species + sample_type,  scales="free", space="free") + 
+        facet_grid(functionid ~ sample_type, scales="free",space="free") +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+              strip.text.y = element_text(angle = 0), axis.text.y = element_text(angle=45, size=5)) + 
+        labs(y="Functional Attribute",x="Samples",fill="GIFT")
+
+
+```
+###Identify Significant Functions by Host Species
+```{r ancom_gift_species, warning=FALSE}
+
+elements_table_ps <- otu_table(as.matrix(t(GIFTs_elements_community_no0)), taxa_are_rows = TRUE)
+
+# Convert metadata to phyloseq sample_data object
+sample_data_ps <- sample_data(column_to_rownames(sample_metadata, "sample"))
+
+# Combine into phyloseq object
+ancom_table <- phyloseq(elements_table_ps, sample_data_ps)
+
+exp_species <- ancombc2(
+    data = ancom_table,
+    fix_formula = "species",   
+    p_adj_method = "holm",
+    prv_cut = 0.1,           
+    lib_cut = 20,          
+    group = "species",          
+    struc_zero = TRUE,
+    neg_lb = TRUE,
+    alpha = 0.05,
+    global = TRUE,
+    n_cl = 1,
+    verbose = TRUE
+)
+
+# View results
+lfc_species <- as.data.frame(exp_species$res$taxon)
+colnames(lfc_species)[1] = "Function"
+rownames(lfc_species) = lfc_species$Function
+lfc_species$Function = NULL
+
+lfc_species = mutate(lfc_species, lfc = exp_species$res$`lfc_speciesCoragyps atratus`)
+lfc_species = mutate(lfc_species, q_val = exp_species$res$`q_speciesCoragyps atratus`)
+
+# See significant taxa
+sig_func_species = filter(lfc_species, q_val < 0.05)
+
+print(sig_func_species)
+
+```
+
+
+```{r GIFT_sig_species, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
+#Match significant functions to table
+GIFTs_elements_community_no0_sig = GIFTs_elements_community_no0[, which(match(colnames(GIFTs_elements_community_no0), rownames(sig_func_species))>0)]
+
+GIFTs_elements_community_no0_sig %>%
+    as.data.frame() %>%
+    rownames_to_column(var="sample") %>%
+    pivot_longer(!sample,names_to="trait",values_to="gift") %>%
+    left_join(sample_metadata, by = join_by(sample == sample)) %>%
+as.data.frame(GIFTs_elements_community_no0_sig) %>%
+    mutate(functionid = substr(trait, 1, 3)) %>%
+    mutate(trait = case_when(
+      trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait, GIFT_db2$Code_element)],
+      TRUE ~ trait
+    )) %>%
+    mutate(functionid = case_when(
+      functionid %in% GIFT_db2$Code_function ~ GIFT_db2$Function[match(functionid, GIFT_db2$Code_function)],
+      TRUE ~ functionid
+    )) %>%
+    mutate(trait=factor(trait,levels=unique(GIFT_db2$Element))) %>%
+    mutate(functionid=factor(functionid,levels=unique(GIFT_db2$Function))) %>%
+    ggplot(aes(x=sample,y=trait,fill=gift)) +
+        geom_tile(colour="white", linewidth=0.2)+
+        scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) + 
+        #facet_nested(~ species + sample_type,  scales="free", space="free") + 
+        facet_grid(functionid ~ species, scales="free",space="free") +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+              strip.text.y = element_text(angle = 0), axis.text.y = element_text(angle=45, size=5)) + 
+        labs(y="Functional Attribute",x="Samples",fill="GIFT")
+
+
+```
+###Identify Significant Functions by Sex
+```{r ancom_gift_sex, warning=FALSE}
+
+elements_table_ps <- otu_table(as.matrix(t(GIFTs_elements_community_no0)), taxa_are_rows = TRUE)
+
+# Convert metadata to phyloseq sample_data object
+sample_data_ps <- sample_data(column_to_rownames(sample_metadata, "sample"))
+
+# Combine into phyloseq object
+ancom_table <- phyloseq(elements_table_ps, sample_data_ps)
+
+exp_sex <- ancombc2(
+    data = ancom_table,
+    fix_formula = "sex",   
+    p_adj_method = "holm",
+    prv_cut = 0.1,           
+    lib_cut = 20,          
+    group = "sex",          
+    struc_zero = TRUE,
+    neg_lb = TRUE,
+    alpha = 0.05,
+    global = TRUE,
+    n_cl = 1,
+    verbose = TRUE
+)
+
+# View results
+lfc_sex <- as.data.frame(exp_sex$res$taxon)
+colnames(lfc_sex)[1] = "Function"
+rownames(lfc_sex) = lfc_sex$Function
+lfc_sex$Function = NULL
+
+lfc_sex = mutate(lfc_sex, lfc = exp_sex$res$`lfc_sexMale`)
+lfc_sex = mutate(lfc_sex, q_val = exp_sex$res$`q_sexMale`)
+
+# See significant taxa
+sig_func_sex = filter(lfc_sex, q_val < 0.05)
+
+print(sig_func_sex)
+
+```
+
+
+```{r GIFT_sig_sex, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
+#Match significant functions to table
+GIFTs_elements_community_no0_sig = GIFTs_elements_community_no0[, which(match(colnames(GIFTs_elements_community_no0), rownames(sig_func_sex))>0)]
+
+GIFTs_elements_community_no0_sig %>%
+    as.data.frame() %>%
+    rownames_to_column(var="sample") %>%
+    pivot_longer(!sample,names_to="trait",values_to="gift") %>%
+    left_join(sample_metadata, by = join_by(sample == sample)) %>%
+as.data.frame(GIFTs_elements_community_no0_sig) %>%
+    mutate(functionid = substr(trait, 1, 3)) %>%
+    mutate(trait = case_when(
+      trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait, GIFT_db2$Code_element)],
+      TRUE ~ trait
+    )) %>%
+    mutate(functionid = case_when(
+      functionid %in% GIFT_db2$Code_function ~ GIFT_db2$Function[match(functionid, GIFT_db2$Code_function)],
+      TRUE ~ functionid
+    )) %>%
+    mutate(trait=factor(trait,levels=unique(GIFT_db2$Element))) %>%
+    mutate(functionid=factor(functionid,levels=unique(GIFT_db2$Function))) %>%
+    ggplot(aes(x=sample,y=trait,fill=gift)) +
+        geom_tile(colour="white", linewidth=0.2)+
+        scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) + 
+        #facet_nested(~ species + sample_type,  scales="free", space="free") + 
+        facet_grid(functionid ~ sex, scales="free",space="free") +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+              strip.text.y = element_text(angle = 0), axis.text.y = element_text(angle=45, size=5)) + 
+        labs(y="Functional Attribute",x="Samples",fill="GIFT")
+
+
+```
+
+###Identify Significant Functions by State
+```{r ancom_gift_state, warning=FALSE}
+
+elements_table_ps <- otu_table(as.matrix(t(GIFTs_elements_community_no0)), taxa_are_rows = TRUE)
+
+# Convert metadata to phyloseq sample_data object
+sample_data_ps <- sample_data(column_to_rownames(sample_metadata, "sample"))
+
+# Combine into phyloseq object
+ancom_table <- phyloseq(elements_table_ps, sample_data_ps)
+
+exp_state <- ancombc2(
+    data = ancom_table,
+    fix_formula = "state",   
+    p_adj_method = "holm",
+    prv_cut = 0.1,           
+    lib_cut = 20,          
+    group = "state",          
+    struc_zero = TRUE,
+    neg_lb = TRUE,
+    alpha = 0.05,
+    global = TRUE,
+    n_cl = 1,
+    verbose = TRUE
+)
+
+# View results
+lfc_state <- as.data.frame(exp_state$res$taxon)
+colnames(lfc_state)[1] = "Function"
+rownames(lfc_state) = lfc_state$Function
+lfc_state$Function = NULL
+
+lfc_state = mutate(lfc_state, lfc = exp_state$res$`lfc_stateTexas`)
+lfc_state = mutate(lfc_state, q_val = exp_state$res$`q_stateTexas`)
+
+# See significant taxa
+sig_func_state = filter(lfc_state, q_val < 0.05)
+
+print(sig_func_state)
+
+```
+
+
+```{r GIFT_sig_state, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
+#Match significant functions to table
+GIFTs_elements_community_no0_sig = GIFTs_elements_community_no0[, which(match(colnames(GIFTs_elements_community_no0), rownames(sig_func_state))>0)]
+
+GIFTs_elements_community_no0_sig %>%
+    as.data.frame() %>%
+    rownames_to_column(var="sample") %>%
+    pivot_longer(!sample,names_to="trait",values_to="gift") %>%
+    left_join(sample_metadata, by = join_by(sample == sample)) %>%
+as.data.frame(GIFTs_elements_community_no0_sig) %>%
+    mutate(functionid = substr(trait, 1, 3)) %>%
+    mutate(trait = case_when(
+      trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait, GIFT_db2$Code_element)],
+      TRUE ~ trait
+    )) %>%
+    mutate(functionid = case_when(
+      functionid %in% GIFT_db2$Code_function ~ GIFT_db2$Function[match(functionid, GIFT_db2$Code_function)],
+      TRUE ~ functionid
+    )) %>%
+    mutate(trait=factor(trait,levels=unique(GIFT_db2$Element))) %>%
+    mutate(functionid=factor(functionid,levels=unique(GIFT_db2$Function))) %>%
+    ggplot(aes(x=sample,y=trait,fill=gift)) +
+        geom_tile(colour="white", linewidth=0.2)+
+        scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) + 
+        #facet_nested(~ species + sample_type,  scales="free", space="free") + 
+        facet_grid(functionid ~ state, scales="free",space="free") +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+              strip.text.y = element_text(angle = 0), axis.text.y = element_text(angle=45, size=5)) + 
+        labs(y="Functional Attribute",x="Samples",fill="GIFT")
+
 
 ```
