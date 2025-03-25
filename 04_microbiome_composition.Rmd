@@ -4,7 +4,9 @@
 load("data/data.Rdata")
 ```
 
-### Taxonomy barplot per individual
+## Taxonomy
+
+### Abundance barplot per individual
 
 ```{r barplot_individuals, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
 genome_counts_filt %>%
@@ -29,7 +31,7 @@ genome_counts_filt %>%
           #legend.position = "none",
           strip.background.x=element_rect(color = NA, fill= "#f4f4f4"))
 ```
-### Taxonomy barplot per individual by host
+### Abundance barplot per individual by host
 
 ```{r barplot_individuals_host, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
 genome_counts_filt %>%
@@ -55,7 +57,7 @@ genome_counts_filt %>%
           strip.background.x=element_rect(color = NA, fill= "#f4f4f4"))
 ```
 
-### Taxonomy barplot per individual by sample type
+### Abundance barplot per individual by sample type
 
 ```{r barplot_individuals_sampletype, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
 genome_counts_filt %>%
@@ -82,9 +84,8 @@ genome_counts_filt %>%
 ```
 
 
-## Taxonomy boxplot
+## Summary Family
 
-### Family
 ```{r taxonomy_family_summary, warning=FALSE, comments="", message=FALSE}
 family_summary <- genome_counts_filt %>%
   mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS nornalisation
@@ -103,7 +104,7 @@ family_summary %>%
     tt()
 ```
 
-
+### Jitterplot
 ```{r taxonomy_jitterplot_family, warning=FALSE, comments="", message=FALSE, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
 family_arrange <- family_summary %>%
     filter(!is.na(relabun)) %>%
@@ -131,7 +132,7 @@ family_summary %>%
         theme(legend.position = "none")
 ```
 
-### Genus
+## Summary Genus
 ```{r taxonomy_genus_summary, warning=FALSE, comments="", message=FALSE}
 genus_summary <- genome_counts_filt %>%
   mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS nornalisation
@@ -150,6 +151,7 @@ genus_summary %>%
     tt()
 ```
 
+### Jitterplot Genus
 ```{r taxonomy_jitterplot_genus, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
 genus_arrange <- genus_summary %>%
     group_by(genus) %>%
@@ -178,6 +180,8 @@ genus_summary %>%
 
 
 ## Alpha diversity
+
+### Calculate Hill Numbers
 
 ```{r alpha_div, comment="", message=FALSE, warning=FALSE}
 # Calculate Hill numbers
@@ -231,6 +235,7 @@ alpha_div <- richness %>%
   full_join(functional, by = join_by(sample == sample))
 ```
 
+### Plot Alpha Diversity
 ```{r alpha_div_plot, comment="", message=FALSE, warning=FALSE, fig.height=3, fig.width=10, fig.fullwidth=TRUE}
 alpha_div %>%
   pivot_longer(-sample, names_to = "metric", values_to = "value") %>%
@@ -261,6 +266,8 @@ alpha_div %>%
 ```
 
 ## Beta diversity
+
+#Calculate Hill Numbers
 
 ```{r beta_div, comment="", message=FALSE, warning=FALSE}
 
@@ -339,7 +346,7 @@ adonis2(beta_q0n$S ~ species,
         broom::tidy() %>%
         tt()
 ```
-## Richness diversity plot (Sample Type)
+### Richness diversity plot (Sample Type)
 ```{r rich_div_sample, warning=FALSE, comments="", message=FALSE}
 beta_q0n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
@@ -380,7 +387,7 @@ adonis2(beta_q0n$S ~ sample_type,
         broom::tidy() %>%
         tt()
 ```
-## Richness diversity plot (Sex)
+### Richness diversity plot (Sex)
 ```{r rich_div_sex, warning=FALSE, comments="", message=FALSE}
 beta_q0n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
@@ -417,7 +424,7 @@ adonis2(beta_q0n$S ~ sex,
         broom::tidy() %>%
         tt()
 ```
-## Richness diversity plot (State)
+### Richness diversity plot (State)
 ```{r rich_div_state, warning=FALSE, comments="", message=FALSE}
 beta_q0n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
@@ -454,7 +461,7 @@ adonis2(beta_q0n$S ~ state,
         broom::tidy() %>%
         tt()
 ```
-##Neutral Diversity (Species)
+### Neutral Diversity (Species)
 ``` {r neutral_div_species, warning=FALSE, comments="", message=FALSE}
 beta_q1n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
@@ -491,7 +498,7 @@ adonis2(beta_q1n$S ~ species,
 
 
 ```
-##Neutral Diversity (Sample Type)
+### Neutral Diversity (Sample Type)
 ``` {r neutral_div_sample, warning=FALSE, comments="", message=FALSE}
 beta_q1n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
@@ -529,7 +536,7 @@ adonis2(beta_q1n$S ~ sample_type,
 
 ```
 
-##Neutral Diversity (Sex)
+### Neutral Diversity (Sex)
 ``` {r neutral_div_sex, warning=FALSE, comments="", message=FALSE}
 beta_q1n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
@@ -565,7 +572,7 @@ adonis2(beta_q1n$S ~ sex,
         broom::tidy() %>%
         tt()
 ```
-##Neutral Diversity (State)
+### Neutral Diversity (State)
 ``` {r neutral_div_state, warning=FALSE, comments="", message=FALSE}
 beta_q1n$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
@@ -602,7 +609,7 @@ adonis2(beta_q1n$S ~ state,
         tt()
 ```
 
-##Functional Diversity (Species and State)
+### Functional Diversity (Species and State)
 ``` {r function_div_species_state, warning=FALSE, comments="", message=FALSE, echo=FALSE}
 beta_q1f$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
@@ -635,7 +642,7 @@ beta_q1f$S %>%
 #ordiplot(pcoa)
 ```
 
-##Functional Diversity (State)
+### Functional Diversity (State)
 ``` {r function_div_state, warning=FALSE, comments="", message=FALSE, echo=FALSE}
 beta_q1f$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
@@ -664,6 +671,8 @@ beta_q1f$S %>%
 ```
 
 ## Functional Differences
+
+### Calculate GIFT Scores
 ```{r calculate_gift, warning=FALSE}
 # Aggregate bundle-level GIFTs into the compound level
 GIFTs_elements <- to.elements(genome_gifts, GIFT_db2)
@@ -691,7 +700,7 @@ GIFTs_domains_community <- to.community(GIFTs_domains, genome_counts_filt %>% co
 
 ```
 
-## Functional Level
+### Functional Level
 ```{r functional_level_gift}
 GIFTs_functions_community_no0 <- GIFTs_functions_community[rowSums(GIFTs_functions_community[])>0,]
 
@@ -706,42 +715,41 @@ GIFTs_functions_community_no0 %>%
         facet_grid(sample_type ~ ., scales="free",space="free")
 ```
 
-## GIFT test
-``` {r}
-## Some errors with lmer
-#! number of levels of each grouping factor must be < number of observations (problems: individual)
-# GIFTs_functions_community_tt <- GIFTs_functions_community %>%
-#   as.data.frame() %>%
-#   rownames_to_column("sample") %>%
-#   separate(sample, into = c("individual", "sample_type"), sep = "\\.") 
-# 
-# GIFTs_functions_community_tt$sample_type = sample_metadata$sample_type[match(GIFTs_functions_community_tt$individual, sample_metadata$sample)]
-# 
-# GIFTs_functions_community_tt %>%
-#   pivot_longer(-c(individual, sample_type), names_to = "trait", values_to = "value") %>%
-#   group_by(trait) %>%
-#   mutate(model_result = list(lmerTest::lmer(value ~ sample_type + (1 | individual)))) %>%
-#   ungroup() %>%
-#   select(trait,model_result) %>%
-#   unique() %>%
-#   mutate(estimate = map_dbl(model_result, ~broom.mixed::tidy(.) %>% filter(term == "typefeces") %>% pull(estimate))) %>%
-# 
-#   mutate(p_value = map_dbl(model_result, ~broom.mixed::tidy(.) %>% filter(term == "typefeces") %>% pull(p.value))) %>%
-#   mutate(p_value_adj = p.adjust(p_value, method = "bonferroni")) %>%
-#   left_join(GIFT_db2 %>% select(Code_function,Function) %>% unique(),by=join_by(trait==Code_function)) %>%
-#   rename(id=trait,trait=Function) %>%
-#   select(id,trait, estimate, p_value_adj)
-# 
-# GIFTs_functions_community_tt %>% tt() |> 
-#       style_tt(
-#         i = which(GIFTs_functions_community_tt$estimate < 0 & GIFTs_functions_community_tt$p_value_adj < 0.05),
-#         background = "#E5D5B1") |> 
-#       style_tt(
-#         i = which(GIFTs_functions_community_tt$estimate > 0 & GIFTs_functions_community_tt$p_value_adj < 0.05),
-#         background = "#B7BCCE")
+``` {r gift_test, include=FALSE}
+# Some errors with lmer
+#number of levels of each grouping factor must be < number of observations (problems: individual)
+GIFTs_functions_community_tt <- GIFTs_functions_community %>%
+  as.data.frame() %>%
+  rownames_to_column("sample") %>%
+  separate(sample, into = c("individual", "sample_type"), sep = "\\.")
+
+GIFTs_functions_community_tt$sample_type = sample_metadata$sample_type[match(GIFTs_functions_community_tt$individual, sample_metadata$sample)]
+
+GIFTs_functions_community_tt %>%
+  pivot_longer(-c(individual, sample_type), names_to = "trait", values_to = "value") %>%
+  group_by(trait) %>%
+  mutate(model_result = list(lmerTest::lmer(value ~ sample_type + (1 | individual)))) %>%
+  ungroup() %>%
+  select(trait,model_result) %>%
+  unique() %>%
+  mutate(estimate = map_dbl(model_result, ~broom.mixed::tidy(.) %>% filter(term == "typefeces") %>% pull(estimate))) %>%
+
+  mutate(p_value = map_dbl(model_result, ~broom.mixed::tidy(.) %>% filter(term == "typefeces") %>% pull(p.value))) %>%
+  mutate(p_value_adj = p.adjust(p_value, method = "bonferroni")) %>%
+  left_join(GIFT_db2 %>% select(Code_function,Function) %>% unique(),by=join_by(trait==Code_function)) %>%
+  rename(id=trait,trait=Function) %>%
+  select(id,trait, estimate, p_value_adj)
+
+GIFTs_functions_community_tt %>% tt() |>
+      style_tt(
+        i = which(GIFTs_functions_community_tt$estimate < 0 & GIFTs_functions_community_tt$p_value_adj < 0.05),
+        background = "#E5D5B1") |>
+      style_tt(
+        i = which(GIFTs_functions_community_tt$estimate > 0 & GIFTs_functions_community_tt$p_value_adj < 0.05),
+        background = "#B7BCCE")
 ```
 
-## Element Level
+### Element Level
 ```{r element_level_gift, fig.height=15, fig.width=10, fig.fullwidth=TRUE}
 #Filter out samples with only 0 GIFT scores
 GIFTs_elements_community_no0 <- GIFTs_elements_community[rowSums(GIFTs_elements_community[])>0,]
@@ -775,7 +783,7 @@ as.data.frame(GIFTs_elements_community_no0) %>%
 
 ```
 
-## Element Level Individual functions
+### Element Level Individual functions
 ```{r individual_factor_element, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
 
 #Change column in GIFT_db2 to focus on specific genetic function
@@ -809,6 +817,8 @@ as.data.frame(GIFTs_elements_community_no0) %>%
 
 
 ```
+
+### Function Matrix
 ```{r Function_Distance_Matrix }
 dist_func = vegdist(GIFTs_elements_community_no0, method ="bray" )
 adonis2(dist_func ~ sample_metadata_non0$species, 
@@ -862,8 +872,8 @@ ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
 
 
 ```
-###Identify Significant functions by Sample Type
-```{r ancom_gift_sampletype}
+### Identify Significant functions by Sample Type
+```{r ancom_gift_sampletype, include= FALSE}
 
 elements_table_ps <- otu_table(as.matrix(t(GIFTs_elements_community_no0)), taxa_are_rows = TRUE)
 
@@ -904,7 +914,7 @@ print(sig_func_sampletype)
 ```
 
 
-```{r GIFT_sig_sampletype, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
+```{r GIFT_sig_sampletype, fig.height=5, fig.width=10, fig.fullwidth=TRUE, include = FALSE}
 #Match significant functions to table
 GIFTs_elements_community_no0_sig = GIFTs_elements_community_no0[, which(match(colnames(GIFTs_elements_community_no0), rownames(sig_func_sampletype))>0)]
 
@@ -936,59 +946,47 @@ as.data.frame(GIFTs_elements_community_no0_sig) %>%
 
 
 ```
-###Identify Significant Functions by Host Species
-```{r ancom_gift_species, warning=FALSE}
 
-elements_table_ps <- otu_table(as.matrix(t(GIFTs_elements_community_no0)), taxa_are_rows = TRUE)
+### Wilcoxon comparison
+```{r community_elem, comment="", echo=FALSE, message=FALSE, warning=FALSE}
+element_gift <- GIFTs_elements_community_no0 %>% 
+  as.data.frame() %>% 
+  rownames_to_column(., "sample") %>% 
+  #Change column in sample_metadata to change comparison sample_type, species, etc
+  left_join(sample_metadata[c(1,3)], by="sample")
+comparison = colnames(element_gift)[length(colnames(element_gift))]
 
-# Convert metadata to phyloseq sample_data object
-sample_data_ps <- sample_data(column_to_rownames(sample_metadata, "sample"))
+uniqueGIFT_db<- unique(GIFT_db2) %>% unite("Function",Function:Element, sep= "_", remove=FALSE)
 
-# Combine into phyloseq object
-ancom_table <- phyloseq(elements_table_ps, sample_data_ps)
-
-exp_species <- ancombc2(
-    data = ancom_table,
-    fix_formula = "species",   
-    p_adj_method = "holm",
-    prv_cut = 0.1,           
-    lib_cut = 20,          
-    group = "species",          
-    struc_zero = TRUE,
-    neg_lb = TRUE,
-    alpha = 0.05,
-    global = TRUE,
-    n_cl = 1,
-    verbose = TRUE
-)
-
-# View results
-lfc_species <- as.data.frame(exp_species$res$taxon)
-colnames(lfc_species)[1] = "Function"
-rownames(lfc_species) = lfc_species$Function
-lfc_species$Function = NULL
-
-lfc_species = mutate(lfc_species, lfc = exp_species$res$`lfc_speciesCoragyps atratus`)
-lfc_species = mutate(lfc_species, q_val = exp_species$res$`q_speciesCoragyps atratus`)
-
-# See significant taxa
-sig_func_species = filter(lfc_species, q_val < 0.05)
-
-print(sig_func_species)
-
-```
+#Wilcoxan test
+sig_wilcox_sample = element_gift %>%
+  pivot_longer(-c(sample, comparison), names_to = "trait", values_to = "value") %>%
+  group_by(trait) %>%
+  summarise(
+    p_value = wilcox.test(value ~ get(comparison))$p.value,
+    mean_1 = mean(value[comparison == unique(element_gift[,comparison])[1]], na.rm = TRUE),
+    mean_2 = mean(value[comparison == unique(element_gift[,comparison])[2]], na.rm = TRUE),
+    mean_difference = mean_1 - mean_2,  # Magnitude of difference
+    direction = case_when(
+      mean_difference > 0 ~ paste("Higher in", unique(element_gift[,comparison])[1]),
+      mean_difference < 0 ~ paste("Higher in", unique(element_gift[,comparison])[2]),
+      TRUE ~ "No Difference"
+    )
+  ) %>%
+  mutate(p_adjust = p.adjust(p_value, method = "BH")) %>%
+  filter(p_adjust < 0.01)
 
 
-```{r GIFT_sig_species, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
 #Match significant functions to table
-GIFTs_elements_community_no0_sig = GIFTs_elements_community_no0[, which(match(colnames(GIFTs_elements_community_no0), rownames(sig_func_species))>0)]
+wilcox_elements_community_no0_sig = GIFTs_elements_community_no0[, which(match(colnames(GIFTs_elements_community_no0), sig_wilcox_sample$trait)>0)]
 
-GIFTs_elements_community_no0_sig %>%
+#Create table of gift scores with significant differences between comparisons
+wilcox_elements_community_no0_sig %>%
     as.data.frame() %>%
     rownames_to_column(var="sample") %>%
     pivot_longer(!sample,names_to="trait",values_to="gift") %>%
     left_join(sample_metadata, by = join_by(sample == sample)) %>%
-as.data.frame(GIFTs_elements_community_no0_sig) %>%
+as.data.frame(wilcox_elements_community_no0_sig) %>%
     mutate(functionid = substr(trait, 1, 3)) %>%
     mutate(trait = case_when(
       trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait, GIFT_db2$Code_element)],
@@ -1004,158 +1002,7 @@ as.data.frame(GIFTs_elements_community_no0_sig) %>%
         geom_tile(colour="white", linewidth=0.2)+
         scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) + 
         #facet_nested(~ species + sample_type,  scales="free", space="free") + 
-        facet_grid(functionid ~ species, scales="free",space="free") +
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-              strip.text.y = element_text(angle = 0), axis.text.y = element_text(angle=45, size=5)) + 
-        labs(y="Functional Attribute",x="Samples",fill="GIFT")
-
-
-```
-###Identify Significant Functions by Sex
-```{r ancom_gift_sex, warning=FALSE}
-
-elements_table_ps <- otu_table(as.matrix(t(GIFTs_elements_community_no0)), taxa_are_rows = TRUE)
-
-# Convert metadata to phyloseq sample_data object
-sample_data_ps <- sample_data(column_to_rownames(sample_metadata, "sample"))
-
-# Combine into phyloseq object
-ancom_table <- phyloseq(elements_table_ps, sample_data_ps)
-
-exp_sex <- ancombc2(
-    data = ancom_table,
-    fix_formula = "sex",   
-    p_adj_method = "holm",
-    prv_cut = 0.1,           
-    lib_cut = 20,          
-    group = "sex",          
-    struc_zero = TRUE,
-    neg_lb = TRUE,
-    alpha = 0.05,
-    global = TRUE,
-    n_cl = 1,
-    verbose = TRUE
-)
-
-# View results
-lfc_sex <- as.data.frame(exp_sex$res$taxon)
-colnames(lfc_sex)[1] = "Function"
-rownames(lfc_sex) = lfc_sex$Function
-lfc_sex$Function = NULL
-
-lfc_sex = mutate(lfc_sex, lfc = exp_sex$res$`lfc_sexMale`)
-lfc_sex = mutate(lfc_sex, q_val = exp_sex$res$`q_sexMale`)
-
-# See significant taxa
-sig_func_sex = filter(lfc_sex, q_val < 0.05)
-
-print(sig_func_sex)
-
-```
-
-
-```{r GIFT_sig_sex, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
-#Match significant functions to table
-GIFTs_elements_community_no0_sig = GIFTs_elements_community_no0[, which(match(colnames(GIFTs_elements_community_no0), rownames(sig_func_sex))>0)]
-
-GIFTs_elements_community_no0_sig %>%
-    as.data.frame() %>%
-    rownames_to_column(var="sample") %>%
-    pivot_longer(!sample,names_to="trait",values_to="gift") %>%
-    left_join(sample_metadata, by = join_by(sample == sample)) %>%
-as.data.frame(GIFTs_elements_community_no0_sig) %>%
-    mutate(functionid = substr(trait, 1, 3)) %>%
-    mutate(trait = case_when(
-      trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait, GIFT_db2$Code_element)],
-      TRUE ~ trait
-    )) %>%
-    mutate(functionid = case_when(
-      functionid %in% GIFT_db2$Code_function ~ GIFT_db2$Function[match(functionid, GIFT_db2$Code_function)],
-      TRUE ~ functionid
-    )) %>%
-    mutate(trait=factor(trait,levels=unique(GIFT_db2$Element))) %>%
-    mutate(functionid=factor(functionid,levels=unique(GIFT_db2$Function))) %>%
-    ggplot(aes(x=sample,y=trait,fill=gift)) +
-        geom_tile(colour="white", linewidth=0.2)+
-        scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) + 
-        #facet_nested(~ species + sample_type,  scales="free", space="free") + 
-        facet_grid(functionid ~ sex, scales="free",space="free") +
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-              strip.text.y = element_text(angle = 0), axis.text.y = element_text(angle=45, size=5)) + 
-        labs(y="Functional Attribute",x="Samples",fill="GIFT")
-
-
-```
-
-###Identify Significant Functions by State
-```{r ancom_gift_state, warning=FALSE}
-
-elements_table_ps <- otu_table(as.matrix(t(GIFTs_elements_community_no0)), taxa_are_rows = TRUE)
-
-# Convert metadata to phyloseq sample_data object
-sample_data_ps <- sample_data(column_to_rownames(sample_metadata, "sample"))
-
-# Combine into phyloseq object
-ancom_table <- phyloseq(elements_table_ps, sample_data_ps)
-
-exp_state <- ancombc2(
-    data = ancom_table,
-    fix_formula = "state",   
-    p_adj_method = "holm",
-    prv_cut = 0.1,           
-    lib_cut = 20,          
-    group = "state",          
-    struc_zero = TRUE,
-    neg_lb = TRUE,
-    alpha = 0.05,
-    global = TRUE,
-    n_cl = 1,
-    verbose = TRUE
-)
-
-# View results
-lfc_state <- as.data.frame(exp_state$res$taxon)
-colnames(lfc_state)[1] = "Function"
-rownames(lfc_state) = lfc_state$Function
-lfc_state$Function = NULL
-
-lfc_state = mutate(lfc_state, lfc = exp_state$res$`lfc_stateTexas`)
-lfc_state = mutate(lfc_state, q_val = exp_state$res$`q_stateTexas`)
-
-# See significant taxa
-sig_func_state = filter(lfc_state, q_val < 0.05)
-
-print(sig_func_state)
-
-```
-
-
-```{r GIFT_sig_state, fig.height=5, fig.width=10, fig.fullwidth=TRUE}
-#Match significant functions to table
-GIFTs_elements_community_no0_sig = GIFTs_elements_community_no0[, which(match(colnames(GIFTs_elements_community_no0), rownames(sig_func_state))>0)]
-
-GIFTs_elements_community_no0_sig %>%
-    as.data.frame() %>%
-    rownames_to_column(var="sample") %>%
-    pivot_longer(!sample,names_to="trait",values_to="gift") %>%
-    left_join(sample_metadata, by = join_by(sample == sample)) %>%
-as.data.frame(GIFTs_elements_community_no0_sig) %>%
-    mutate(functionid = substr(trait, 1, 3)) %>%
-    mutate(trait = case_when(
-      trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait, GIFT_db2$Code_element)],
-      TRUE ~ trait
-    )) %>%
-    mutate(functionid = case_when(
-      functionid %in% GIFT_db2$Code_function ~ GIFT_db2$Function[match(functionid, GIFT_db2$Code_function)],
-      TRUE ~ functionid
-    )) %>%
-    mutate(trait=factor(trait,levels=unique(GIFT_db2$Element))) %>%
-    mutate(functionid=factor(functionid,levels=unique(GIFT_db2$Function))) %>%
-    ggplot(aes(x=sample,y=trait,fill=gift)) +
-        geom_tile(colour="white", linewidth=0.2)+
-        scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) + 
-        #facet_nested(~ species + sample_type,  scales="free", space="free") + 
-        facet_grid(functionid ~ state, scales="free",space="free") +
+        facet_grid(functionid ~ get(comparison), scales="free",space="free") +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
               strip.text.y = element_text(angle = 0), axis.text.y = element_text(angle=45, size=5)) + 
         labs(y="Functional Attribute",x="Samples",fill="GIFT")
