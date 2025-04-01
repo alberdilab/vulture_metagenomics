@@ -18,7 +18,7 @@ genome_counts_filt %>%
   ggplot(aes(y=count,x=sample, fill=phylum, group=phylum)) + #grouping enables keeping the same sorting of taxonomic units
     geom_bar(stat="identity", colour="white", linewidth=0.1) + #plot stacked bars with white borders
     scale_fill_manual(values=phylum_colors) +
-    labs(x = "Relative abundance", y ="Samples") +
+    labs(x = "Samples", y ="Relative Abundance") +
     facet_nested(. ~ species.y + sample_type ,  scales="free", space="free") + #facet per day and treatment
     scale_y_continuous(expand = c(0.001, 0.001)) +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
@@ -723,10 +723,10 @@ as.data.frame(GIFTs_elements_community_no0) %>%
 
 ```
 
-### Function Matrix
+### Function Matrix 
 ```{r Function_Distance_Matrix }
 dist_func = vegdist(GIFTs_elements_community_no0, method ="bray" )
-adonis2(dist_func ~ sample_metadata_non0$species, 
+adonis2(dist_func ~ sample_metadata_non0$sample_type, 
         data = as.data.frame(GIFTs_elements_community_no0) %>% arrange(match(sample_metadata_non0$sample,labels(beta_q1n$S))), 
         permutations = 999) %>%
         broom::tidy() %>%
@@ -775,6 +775,108 @@ ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
     legend.position = "right", legend.box = "vertical"
     )
 ```
+### Differential Abundance of Bacteria by Sample Type
+```{r ancom_sampletype, warning=FALSE}
+phylo_metadata = sample_metadata_non0
+phylo_metadata = data.frame(phylo_metadata)
+rownames(phylo_metadata) = phylo_metadata[,1]
+phylo_metadata = phylo_metadata[,-1]
+phylo_metadata = sample_data(phylo_metadata)
+
+phylo_mag = otu_table(genome_counts_non0, taxa_are_rows=TRUE)
+
+mag_table = phyloseq(phylo_mag, phylo_metadata)
+
+res <- ancombc2(
+  data = mag_table,
+  fix_formula = "sample_type",
+  p_adj_method = "holm",
+  lib_cut = 20,
+  group = "sample_type",
+  struc_zero = TRUE,
+  neg_lb = TRUE,
+  alpha = 0.05,
+  global = FALSE,
+  verbose = TRUE
+)
+
+# View results
+lfc_res <- as.data.frame(res$res$taxon)
+colnames(lfc_res)[1] = "Function"
+rownames(lfc_res) = lfc_res$Function
+lfc_res$Function = NULL
+
+lfc_res = mutate(lfc_res, lfc = res$res$'lfc_sample_typeStomach contents')
+lfc_res = mutate(lfc_res, p_val = res$res$'p_sample_typeStomach contents')
+
+# See significant taxa
+sig_taxa_sample = filter(lfc_res, p_val < 0.05)
+print(sig_taxa_sample)
+sig_taxa_sample$genome = rownames(sig_taxa_sample)
+
+sig_taxa_sample = merge(sig_taxa_sample, genome_metadata, by = "genome")
+
+# Bar plot of significant taxa (ordered by log fold change)
+ggplot(sig_taxa_sample, aes(x = reorder(family, lfc), y = lfc, fill = lfc > 0)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +  # Flip the axes for better readability
+  scale_fill_manual(values = sampletype_colors, labels = c("Colon Contents", "Stomach Contents")) + 
+  theme_minimal() +
+  labs(x = "Family", y = "Log Fold Change", title = "Enrichment of Significant Taxa", fill = "More abundant in") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+### Differential Abundance of Bacteria by Species
+```{r ancom_species, warning=FALSE}
+phylo_metadata = sample_metadata_non0
+phylo_metadata = data.frame(phylo_metadata)
+rownames(phylo_metadata) = phylo_metadata[,1]
+phylo_metadata = phylo_metadata[,-1]
+phylo_metadata = sample_data(phylo_metadata)
+
+phylo_mag = otu_table(genome_counts_non0, taxa_are_rows=TRUE)
+
+mag_table = phyloseq(phylo_mag, phylo_metadata)
+
+res <- ancombc2(
+  data = mag_table,
+  fix_formula = "species",
+  p_adj_method = "holm",
+  lib_cut = 20,
+  group = "species",
+  struc_zero = TRUE,
+  neg_lb = TRUE,
+  alpha = 0.05,
+  global = FALSE,
+  verbose = TRUE
+)
+
+# View results
+lfc_res <- as.data.frame(res$res$taxon)
+colnames(lfc_res)[1] = "Function"
+rownames(lfc_res) = lfc_res$Function
+lfc_res$Function = NULL
+
+lfc_res = mutate(lfc_res, lfc = res$res$'lfc_speciesCoragyps atratus')
+lfc_res = mutate(lfc_res, p_val = res$res$'p_speciesCoragyps atratus')
+
+# See significant taxa
+sig_taxa_species = filter(lfc_res, p_val < 0.05)
+print(sig_taxa_species)
+sig_taxa_species$genome = rownames(sig_taxa_species)
+
+sig_taxa_species = merge(sig_taxa_species, genome_metadata, by = "genome")
+
+# Bar plot of significant taxa (ordered by log fold change)
+ggplot(sig_taxa_species, aes(x = reorder(family, lfc), y = lfc, fill = lfc > 0)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +  # Flip the axes for better readability
+  scale_fill_manual(values = species_colors, labels = c("Cathartes aura", "Coragyps atratus")) + 
+  theme_minimal() +
+  labs(x = "Family", y = "Log Fold Change", title = "Enrichment of Significant Taxa", fill = "More abundant in") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
 
 ### Wilcoxon comparison
 ```{r community_elem, comment="", message=FALSE, warning=FALSE, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
@@ -817,7 +919,8 @@ sig_wilcox_sample = element_gift %>%
     ),
     trait_label = paste0(trait_name, " ", p_label)  # Append p-values to trait name
   ) %>%
-  filter(p_adjust < 0.05)  # Keep only significant results
+  filter(p_adjust < 0.01) #Keep only significant results
+  
 
 #Match significant functions to table
 wilcox_elements_community_no0_sig = GIFTs_elements_community_no0[,which(match(colnames(GIFTs_elements_community_no0), sig_wilcox_sample$trait)>0)]
@@ -850,4 +953,16 @@ ggplot(heatmap_data, aes(x=sample, y=paste0(trait, " ", sig_wilcox_sample$p_labe
     labs(y="Functional Attribute (with p-values)", x="Samples", fill="GIFT")
 
 
+```
+### Volcano Plot
+```{r community_elem_volcano, comment="", message=FALSE, warning=FALSE, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
+sig_wilcox_sample$negLogP <- -log10(sig_wilcox_sample$p_adjust)
+
+ggplot(sig_wilcox_sample, aes(x = mean_difference, y = negLogP)) +
+  geom_point(aes(), alpha = 0.7) +  # Highlight significant points
+  geom_text_repel(aes(label = trait_name), size = 3, max.overlaps = 10) +  # Avoid too many overlapping labels
+  theme_minimal() +
+  labs(x = "GIFT Difference",
+       y = "-Log10(P-value)") +
+  theme(plot.title = element_text(hjust = 0.5))  # Center title
 ```
