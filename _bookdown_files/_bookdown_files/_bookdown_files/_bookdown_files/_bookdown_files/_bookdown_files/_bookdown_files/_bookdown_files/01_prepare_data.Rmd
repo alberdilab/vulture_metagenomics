@@ -25,7 +25,6 @@ sample_metadata = left_join(sample_metadata, individuals, by = "sample")
 ```{r load_read_counts, warning=FALSE, comments="", message=FALSE}
 read_counts <- read_tsv("data/DMB0117_counts.tsv.gz") %>%
     rename(genome=1)
-read_counts
 ```
 
 ### Genome base hits
@@ -33,7 +32,6 @@ read_counts
 ```{r load_genome_hits, warning=FALSE, comments="", message=FALSE}
 genome_coverage <- read_tsv("data/DMB0117_coverage.tsv.gz") %>%
     rename(genome=1)
-genome_coverage
 ```
 
 ### Genome taxonomy
@@ -102,7 +100,7 @@ genome_counts_filt <- read_counts_filt %>%
 ### Distill annotations into GIFTs 
 
 ```{r distill_annotations, warning=FALSE, comments="", message=FALSE}
-genome_gifts <- distill(genome_annotations,GIFT_db,genomecol=2,annotcol=c(9,10,19), verbosity=F)
+genome_gifts <- distill(genome_annotations,GIFT_db2,genomecol=2,annotcol=c(9,10,19), verbosity=F)
 ```
 
 ## Prepare color scheme
@@ -112,7 +110,7 @@ genome_gifts <- distill(genome_annotations,GIFT_db,genomecol=2,annotcol=c(9,10,1
 ```{r get_ehi_colors, warning=FALSE, comments="", message=FALSE}
 colors = read_tsv("https://raw.githubusercontent.com/earthhologenome/EHI_taxonomy_colour/main/ehi_phylum_colors.tsv")
 #Put colorblind friendly colors and non overlapping colors into the EHI colors
-colors[match(c("p__Actinomycetota", "p__Bacillota", "p__Bacillota_A", "p__Bacillota_B", "p__Bacillota_C", "p__Bacteroidota", "p__Campylobacterota", "p__Chlamydiota", "p__Deferribacterota", "p__Desulfobacterota", "p__Fusobacteriota", "p__Pseudomonadota"), colors$phylum), 2] = c("#c8c8c8", "#f0c571", "#59a89c", "#d47264", "#e25759", "#9d2c00", "#7E4794", "#36b700", "#00317e", "#008dff", "#c701ff", "#0d0d0d")
+#colors[match(c("p__Actinomycetota", "p__Bacillota", "p__Bacillota_A", "p__Bacillota_B", "p__Bacillota_C", "p__Bacteroidota", "p__Campylobacterota", "p__Chlamydiota", "p__Deferribacterota", "p__Desulfobacterota", "p__Fusobacteriota", "p__Pseudomonadota"), colors$phylum), 2] = c("#c8c8c8", "#f0c571", "#59a89c", "#d47264", "#e25759", "#9d2c00", "#7E4794", "#36b700", "#00317e", "#008dff", "#c701ff", "#0d0d0d")
 phylum_colors <- colors %>%
     right_join(genome_metadata, by=join_by(phylum == phylum)) %>%
     arrange(match(genome, genome_tree$tip.label)) %>%
@@ -127,7 +125,9 @@ phylum_colors <- colors %>%
 species_colors = c("#d83034", "#0d0d0d")
 sampletype_colors = c("#f45f74", "#008dff")
 sex_colors = c("#bdd373", "#003a7d")
-state_colors = c("#ff8ca1", "#f45f74")
+state_colors = c("#D55E00", "#CC79A7")
+
+
 
 ```
 

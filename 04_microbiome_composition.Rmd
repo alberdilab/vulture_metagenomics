@@ -31,58 +31,6 @@ genome_counts_filt %>%
           #legend.position = "none",
           strip.background.x=element_rect(color = NA, fill= "#f4f4f4"))
 ```
-### Abundance barplot per individual by host
-
-```{r barplot_individuals_host, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
-genome_counts_filt %>%
-  mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS nornalisation
-  pivot_longer(-genome, names_to = "sample", values_to = "count") %>% #reduce to minimum number of columns
-  left_join(., genome_metadata, by = join_by(genome == genome)) %>% #append genome metadata
-  left_join(., sample_metadata, by = join_by(sample == sample)) %>% #append sample metadata
-  filter(!is.na(count)) %>%
-  ggplot(aes(y=count,x=sample, fill=phylum, group=phylum)) + #grouping enables keeping the same sorting of taxonomic units
-    geom_bar(stat="identity", colour="white", linewidth=0.1) + #plot stacked bars with white borders
-    scale_fill_manual(values=phylum_colors) +
-    labs(x = "Relative abundance", y ="Samples") +
-    facet_nested(. ~ species.y,  scales="free", space="free") + #facet per day and treatment
-    scale_y_continuous(expand = c(0.001, 0.001)) +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-          axis.title.x = element_blank(),
-          panel.background = element_blank(),
-          panel.border = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          axis.line = element_line(linewidth = 0.5, linetype = "solid", colour = "black"),
-          #legend.position = "none",
-          strip.background.x=element_rect(color = NA, fill= "#f4f4f4"))
-```
-
-### Abundance barplot per individual by sample type
-
-```{r barplot_individuals_sampletype, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
-genome_counts_filt %>%
-  mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS nornalisation
-  pivot_longer(-genome, names_to = "sample", values_to = "count") %>% #reduce to minimum number of columns
-  left_join(., genome_metadata, by = join_by(genome == genome)) %>% #append genome metadata
-  left_join(., sample_metadata, by = join_by(sample == sample)) %>% #append sample metadata
-  filter(!is.na(count)) %>%
-  ggplot(aes(y=count,x=sample, fill=phylum, group=phylum)) + #grouping enables keeping the same sorting of taxonomic units
-    geom_bar(stat="identity", colour="white", linewidth=0.1) + #plot stacked bars with white borders
-    scale_fill_manual(values=phylum_colors) +
-    labs(x = "Relative abundance", y ="Samples") +
-    facet_nested(. ~ sample_type ,  scales="free", space="free") + #facet per day and treatment
-    scale_y_continuous(expand = c(0.001, 0.001)) +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-          axis.title.x = element_blank(),
-          panel.background = element_blank(),
-          panel.border = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          axis.line = element_line(linewidth = 0.5, linetype = "solid", colour = "black"),
-          #legend.position = "none",
-          strip.background.x=element_rect(color = NA, fill= "#f4f4f4"))
-```
-
 
 ## Summary Family
 
@@ -723,57 +671,87 @@ as.data.frame(GIFTs_elements_community_no0) %>%
 
 ```
 
-### Function Matrix 
-```{r Function_Distance_Matrix }
-dist_func = vegdist(GIFTs_elements_community_no0, method ="bray" )
-adonis2(dist_func ~ sample_metadata_non0$sample_type, 
-        data = as.data.frame(GIFTs_elements_community_no0) %>% arrange(match(sample_metadata_non0$sample,labels(beta_q1n$S))), 
-        permutations = 999) %>%
-        broom::tidy() %>%
-        tt()
-betadisper(dist_func, sample_metadata_non0$sample_type) %>% permutest()
+```{r Function_NMDS_Matrix, warning=FALSE }
+# Compute Bray-Curtis dissimilarity matrix
+dist_func <- vegdist(GIFTs_elements_community_no0, method = "bray")
 
+# PERMANOVA test to assess differences between sample types
+adonis2_result <- adonis2(
+  dist_func ~ sample_metadata_non0$sample_type, 
+  data = as.data.frame(GIFTs_elements_community_no0),
+  permutations = 999
+) %>%
+  broom::tidy()
+
+print(adonis2_result)
+
+# PERMANOVA test to assess differences between species
+adonis2_result <- adonis2(
+  dist_func ~ sample_metadata_non0$species, 
+  data = as.data.frame(GIFTs_elements_community_no0),
+  permutations = 999
+) %>%
+  broom::tidy()
+
+print(adonis2_result)
+
+# Homogeneity of dispersions test
+betadisper_result <- betadisper(dist_func, sample_metadata_non0$sample_type)
+permutest(betadisper_result)
+
+# Perform NMDS with 2 dimensions
 set.seed(123)
 nmds_result <- metaMDS(dist_func, k = 2, trymax = 100)
-nmds_scores <- as.data.frame(nmds_result$points)
 
-#GIFT ordination by sample type
+# Extract NMDS coordinates
+nmds_scores <- as.data.frame(nmds_result$points)
+colnames(nmds_scores) <- c("NMDS1", "NMDS2")
+
+# Add metadata for visualization
 nmds_scores$Group <- sample_metadata_non0$sample_type
 
-x_cen = mean(nmds_scores$MDS1, na.rm = TRUE)
-y_cen = mean(nmds_scores$MDS2, na.rm = TRUE)
-ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
+# Calculate centroid
+x_cen <- mean(nmds_scores$NMDS1, na.rm = TRUE)
+y_cen <- mean(nmds_scores$NMDS2, na.rm = TRUE)
+
+
+# Plot NMDS ordination by sample type
+ggplot(nmds_scores, aes(x = NMDS1, y = NMDS2, color = Group)) +
   geom_point(size = 4) +
   scale_color_manual(values = sampletype_colors) +
-  geom_segment(aes(x = x_cen, y = y_cen, xend = MDS1, yend = MDS2), alpha = 0.9) +
+  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+  theme_minimal() +
   theme(
     axis.title = element_text(size = 12, face = "bold"),
     axis.text = element_text(size = 10),
-    panel.background = element_blank(),
     axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
     legend.text = element_text(size = 10),
     legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    )
+    legend.position = "right"
+  )
 
-#GIFT ordination by species
+# NMDS ordination by species
 nmds_scores$Group <- sample_metadata_non0$species
 
-x_cen = mean(nmds_scores$MDS1, na.rm = TRUE)
-y_cen = mean(nmds_scores$MDS2, na.rm = TRUE)
-ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
+# Recalculate centroid
+x_cen <- mean(nmds_scores$NMDS1, na.rm = TRUE)
+y_cen <- mean(nmds_scores$NMDS2, na.rm = TRUE)
+
+# Plot NMDS ordination by species
+ggplot(nmds_scores, aes(x = NMDS1, y = NMDS2, color = Group)) +
   geom_point(size = 4) +
   scale_color_manual(values = species_colors) +
-  geom_segment(aes(x = x_cen, y = y_cen, xend = MDS1, yend = MDS2), alpha = 0.9) +
+  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+  theme_minimal() +
   theme(
     axis.title = element_text(size = 12, face = "bold"),
     axis.text = element_text(size = 10),
-    panel.background = element_blank(),
     axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
     legend.text = element_text(size = 10),
     legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    )
+    legend.position = "right"
+  )
+
 ```
 ### Differential Abundance of Bacteria by Sample Type
 ```{r ancom_sampletype, warning=FALSE}
@@ -965,4 +943,6 @@ ggplot(sig_wilcox_sample, aes(x = mean_difference, y = negLogP)) +
   labs(x = "GIFT Difference",
        y = "-Log10(P-value)") +
   theme(plot.title = element_text(hjust = 0.5))  # Center title
+
+
 ```
