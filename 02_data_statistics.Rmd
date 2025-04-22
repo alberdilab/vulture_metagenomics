@@ -15,6 +15,8 @@ sample_metadata %>%
     tt()
 ```
 
+
+
 ## DNA fractions
 ```{r dna_fractions_stats}
 sequence_fractions <- read_counts %>%
@@ -52,7 +54,33 @@ sequence_fractions %>%
 	    theme_classic() +
 	    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size=6),legend.position = "bottom")
 ```
+```{r summary_stats}
+#Read Length
+#Minimum read length
+min_read = min(sequence_fractions$mags_bases)
+min_read
+min_row = which(match(sample_metadata$sample, sequence_fractions$sample[which(match(sequence_fractions$mags_bases, min(sequence_fractions$mags_bases))==1)])==1)
+sample_metadata[min_row,c(1,3,5,7,20)]
 
+#Minimum read length
+max_read = max(sequence_fractions$mags_bases)
+max_read
+max_row = which(match(sample_metadata$sample, sequence_fractions$sample[which(match(sequence_fractions$mags_bases, min(sequence_fractions$mags_bases))==1)])==1)
+sample_metadata[min_row,c(1,3,5,7,20)]
+
+#Completeness
+#Average
+mean(genome_metadata$completeness)
+#Standard Deviation
+sd(genome_metadata$completeness)
+
+#Contamination
+#Average
+mean(genome_metadata$contamination)
+#Standard Deviation
+sd(genome_metadata$contamination)
+
+```
 ## Recovered microbial fraction
 
 ```{r data_estimations_plot, message=FALSE, warning=FALSE, fig.height=12, fig.width=10, fig.fullwidth=TRUE}

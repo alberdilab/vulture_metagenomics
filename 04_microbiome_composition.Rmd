@@ -61,7 +61,7 @@ genome_counts_filt %>%
 
 ```{r barplot_individuals_sampletype, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
 genome_counts_filt %>%
-  mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS nornalisation
+  mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS normalisation
   pivot_longer(-genome, names_to = "sample", values_to = "count") %>% #reduce to minimum number of columns
   left_join(., genome_metadata, by = join_by(genome == genome)) %>% #append genome metadata
   left_join(., sample_metadata, by = join_by(sample == sample)) %>% #append sample metadata
@@ -81,6 +81,61 @@ genome_counts_filt %>%
           axis.line = element_line(linewidth = 0.5, linetype = "solid", colour = "black"),
           #legend.position = "none",
           strip.background.x=element_rect(color = NA, fill= "#f4f4f4"))
+```
+
+### Dominant Phyla
+```{r phylum_data_summary, warning=FALSE, comments="", message=FALSE}
+#Dominant phyla
+bin_count = genome_counts_filt %>%
+  mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS normalisation
+  pivot_longer(-genome, names_to = "sample", values_to = "count") %>% #reduce to minimum number of columns
+  left_join(., genome_metadata, by = join_by(genome == genome)) %>% #append genome metadata
+  left_join(., sample_metadata, by = join_by(sample == sample)) %>% #append sample metadata
+  filter(!is.na(count))
+phyla_count = tapply(bin_count$count, bin_count$phylum, sum)
+phyla_rel = phyla_count / sum(phyla_count)
+head(sort(phyla_rel, decreasing = TRUE), 3)
+
+sum(genome_metadata$genus=="g__")
+sum(genome_metadata$species=="s__")
+sum(genome_metadata$species=="s__")/length(genome_metadata$species)
+
+```
+### Unique MAGs
+```{r unique_mags, warning=FALSE, comments="", message=FALSE}
+
+#Host Species Comparison
+caura_count = bin_count[which(match(bin_count$species.y, "Cathartes aura")==1),]
+caura_count = caura_count[-which(match(caura_count$count, 0)==1),]
+# Number of MAGs identified in Cathartes aura
+length(unique(caura_count$genome))
+
+catratus_count = bin_count[which(match(bin_count$species.y, "Coragyps atratus")==1),]
+catratus_count = catratus_count[-which(match(catratus_count$count, 0)==1),]
+# Number of MAGs identified in Coragyps atratus
+length(unique(catratus_count$genome))
+
+# Number of MAGs unique to Cathartes aura
+length(setdiff(unique(caura_count$genome), unique(catratus_count$genome)))
+# Number of MAGs unique to  Coragyps atratus
+length(setdiff(unique(catratus_count$genome), unique(caura_count$genome)))
+
+#Sample Type Comparison
+stomach_count = bin_count[which(match(bin_count$sample_type, "Stomach contents")==1),]
+stomach_count = stomach_count[-which(match(stomach_count$count, 0)==1),]
+# Number of MAGs identified in Stomach Contents
+length(unique(stomach_count$genome))
+
+colon_count = bin_count[which(match(bin_count$sample_type, "Colon contents")==1),]
+colon_count = colon_count[-which(match(colon_count$count, 0)==1),]
+# Number of MAGs identified in Colon Contents
+length(unique(colon_count$genome))
+
+# Number of MAGs unique to Cathartes aura
+length(setdiff(unique(stomach_count$genome), unique(colon_count$genome)))
+# Number of MAGs unique to  Coragyps atratus
+length(setdiff(unique(colon_count$genome), unique(stomach_count$genome)))
+
 ```
 
 
@@ -104,7 +159,7 @@ family_summary %>%
     tt()
 ```
 
-### Jitterplot
+### Jitterplot Family
 ```{r taxonomy_jitterplot_family, warning=FALSE, comments="", message=FALSE, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
 family_arrange <- family_summary %>%
     filter(!is.na(relabun)) %>%
@@ -237,7 +292,7 @@ alpha_div <- richness %>%
 
 ### Plot Alpha Diversity
 ```{r alpha_div_plot, comment="", message=FALSE, warning=FALSE, fig.height=3, fig.width=10, fig.fullwidth=TRUE}
-alpha_div %>%
+alpha_plot = alpha_div %>%
   pivot_longer(-sample, names_to = "metric", values_to = "value") %>%
   left_join(., sample_metadata, by = join_by(sample == sample)) %>%
   mutate(metric=factor(metric,levels=c("richness","neutral","phylogenetic","functional"))) %>%
@@ -263,6 +318,14 @@ alpha_div %>%
         axis.title.x = element_blank(),
         axis.title.y = element_blank(),
         axis.text.x = element_blank())
+
+alpha_long <- alpha_div %>%
+  pivot_longer(-sample, names_to = "metric", values_to = "value") %>%
+  left_join(sample_metadata, by = join_by(sample == sample)) %>%
+  mutate(
+    metric = factor(metric, levels = c("richness", "neutral", "phylogenetic", "functional")),
+    group = paste(species, sample_type, sep = "_"))
+
 ```
 
 ## Beta diversity
@@ -731,6 +794,11 @@ adonis2(dist_func ~ sample_metadata_non0$sample_type,
         permutations = 999) %>%
         broom::tidy() %>%
         tt()
+adonis2(dist_func ~ sample_metadata_non0$species, 
+        data = as.data.frame(GIFTs_elements_community_no0) %>% arrange(match(sample_metadata_non0$sample,labels(beta_q1n$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
 betadisper(dist_func, sample_metadata_non0$sample_type) %>% permutest()
 
 set.seed(123)
@@ -815,14 +883,27 @@ print(sig_taxa_sample)
 sig_taxa_sample$genome = rownames(sig_taxa_sample)
 
 sig_taxa_sample = merge(sig_taxa_sample, genome_metadata, by = "genome")
+sig_taxa_sample$signif_label <- cut(sig_taxa_sample$p_val,
+                                     breaks = c(-Inf, 0.001, 0.01, 0.05, Inf),
+                                     labels = c("***", "**", "*", ""))
 
 # Bar plot of significant taxa (ordered by log fold change)
-ggplot(sig_taxa_sample, aes(x = reorder(family, lfc), y = lfc, fill = lfc > 0)) +
+ggplot(sig_taxa_sample, aes(x = reorder(phylum, lfc), y = lfc, fill = lfc > 0)) +
   geom_bar(stat = "identity", position = "dodge") +
-  coord_flip() +  # Flip the axes for better readability
-  scale_fill_manual(values = sampletype_colors, labels = c("Colon Contents", "Stomach Contents")) + 
+  geom_text(aes(label = signif_label), 
+            hjust = ifelse(sig_taxa_sample$lfc > 0, -0.2, 1.2), 
+            color = "black", 
+            size = 4) +
+  coord_flip() +
+  scale_fill_manual(values = sampletype_colors,
+                    labels = c("Colon Contents", "Stomach Contents")) +
   theme_minimal() +
-  labs(x = "Family", y = "Log Fold Change", title = "Enrichment of Significant Taxa", fill = "More abundant in") +
+  labs(
+    x = "Family",
+    y = "Log Fold Change",
+    title = "Enrichment of Significant Taxa",
+    fill = "More abundant in"
+  ) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
@@ -866,15 +947,29 @@ print(sig_taxa_species)
 sig_taxa_species$genome = rownames(sig_taxa_species)
 
 sig_taxa_species = merge(sig_taxa_species, genome_metadata, by = "genome")
+sig_taxa_species$signif_label <- cut(sig_taxa_species$p_val,
+                                     breaks = c(-Inf, 0.001, 0.01, 0.05, Inf),
+                                     labels = c("***", "**", "*", ""))
 
 # Bar plot of significant taxa (ordered by log fold change)
-ggplot(sig_taxa_species, aes(x = reorder(family, lfc), y = lfc, fill = lfc > 0)) +
+ggplot(sig_taxa_species, aes(x = reorder(phylum, lfc), y = lfc, fill = lfc > 0)) +
   geom_bar(stat = "identity", position = "dodge") +
-  coord_flip() +  # Flip the axes for better readability
-  scale_fill_manual(values = species_colors, labels = c("Cathartes aura", "Coragyps atratus")) + 
+  geom_text(aes(label = signif_label), 
+            hjust = ifelse(sig_taxa_species$lfc > 0, -0.2, 1.2), 
+            color = "black", 
+            size = 4) +
+  coord_flip() +
+  scale_fill_manual(values = species_colors,
+                    labels = c("Cathartes aura", "Coragyps atratus")) +
   theme_minimal() +
-  labs(x = "Family", y = "Log Fold Change", title = "Enrichment of Significant Taxa", fill = "More abundant in") +
+  labs(
+    x = "Family",
+    y = "Log Fold Change",
+    title = "Enrichment of Significant Taxa",
+    fill = "More abundant in"
+  ) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 ```
 
 
