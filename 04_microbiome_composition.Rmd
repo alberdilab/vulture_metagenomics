@@ -101,6 +101,24 @@ sum(genome_metadata$species=="s__")
 sum(genome_metadata$species=="s__")/length(genome_metadata$species)
 
 ```
+
+### MAG Heatmap
+```{r mag_heatmap, warning=FALSE, comments="", message=FALSE}
+heatmap_count = genome_counts_filt
+heatmap_count = column_to_rownames(heatmap_count, "genome")
+heatmap_count = log(heatmap_count + 1)
+
+heatmap_rel = sweep(heatmap_count, 2, colSums(heatmap_count), FUN = "/")
+heatmap_rel = t(scale(t(heatmap_rel)))
+attr(heatmap_rel, "scaled:center") <- NULL
+attr(heatmap_rel, "scaled:scale") <- NULL
+
+
+#pheatmap(as.matrix(heatmap_rel), annotation_col = lapply(sample_metadata, factor), annotation_colors = list(data.frame(species = c("Cathartes aura", "Coragyps atratus"), sample_type = c("Stomach contents", "Colon contents"), state = c("Texas", "Flroida"))), scale = "none")
+
+heatmap(as.matrix(heatmap_rel), scale="none")
+
+```
 ### Unique MAGs
 ```{r unique_mags, warning=FALSE, comments="", message=FALSE}
 
@@ -237,7 +255,6 @@ genus_summary %>%
 ## Alpha diversity
 
 ### Calculate Hill Numbers
-
 ```{r alpha_div, comment="", message=FALSE, warning=FALSE}
 # Calculate Hill numbers
 richness <- genome_counts_filt %>%
@@ -299,7 +316,7 @@ alpha_plot = alpha_div %>%
   unite("group", c(species,sample_type), remove = FALSE) %>%
       ggplot(aes(y = value, x = group, group=group, color=group, fill=group)) +
       geom_boxplot(outlier.shape = NA) +
-  stat_summary(fun.y = mean, color = "black", geom = "point", shape = 20, fill = "black")+
+  stat_summary(fun.y = mean, color = "black", geom = "point", shape = 21, fill = "white",)+
       geom_jitter(alpha=0.5) +
       scale_color_manual(name="Group",
           breaks=c("Cathartes aura_Colon contents","Coragyps atratus_Colon contents","Cathartes aura_Stomach contents","Coragyps atratus_Stomach contents"),
@@ -319,6 +336,8 @@ alpha_plot = alpha_div %>%
         axis.title.y = element_blank(),
         axis.text.x = element_blank())
 
+alpha_plot
+
 alpha_long <- alpha_div %>%
   pivot_longer(-sample, names_to = "metric", values_to = "value") %>%
   left_join(sample_metadata, by = join_by(sample == sample)) %>%
@@ -329,7 +348,6 @@ alpha_long <- alpha_div %>%
 ```
 
 ## Beta diversity
-
 #Calculate Hill Numbers
 
 ```{r beta_div, comment="", message=FALSE, warning=FALSE}
@@ -340,7 +358,49 @@ beta_q0n <- genome_counts_filt %>%
   select_if(~!all(. == 0)) %>%
   hillpair(., q = 0)
 
-beta_q1n <- genome_counts_filt %>%
+#Neutral Divesity with Colon Contents Fixed
+metadata_colon = sample_metadata[which(sample_metadata$sample_type == "Colon contents"),]
+genome_counts_colon = column_to_rownames(genome_counts_filt, "genome")
+genome_counts_colon = genome_counts_colon[,which(colnames(genome_counts_colon) %in% metadata_colon$sample)]
+genome_counts_colon = rownames_to_column(genome_counts_colon, "genome")
+
+beta_q1n_colon <- genome_counts_colon %>%
+  column_to_rownames(., "genome") %>%
+  filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
+  select_if(~!all(. == 0)) %>%
+  hillpair(., q = 1)
+
+#Neutral Divesity with Stomach Contents Fixed
+metadata_stomach = sample_metadata[which(sample_metadata$sample_type == "Stomach contents"),]
+genome_counts_stomach = column_to_rownames(genome_counts_filt, "genome")
+genome_counts_stomach = genome_counts_stomach[,which(colnames(genome_counts_stomach) %in% metadata_stomach$sample)]
+genome_counts_stomach = rownames_to_column(genome_counts_stomach, "genome")
+
+beta_q1n_stomach <- genome_counts_stomach %>%
+  column_to_rownames(., "genome") %>%
+  filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
+  select_if(~!all(. == 0)) %>%
+  hillpair(., q = 1)
+
+#Neutral Divesity with C. aura Fixed
+metadata_caura = sample_metadata[which(sample_metadata$species == "Cathartes aura"),]
+genome_counts_caura = column_to_rownames(genome_counts_filt, "genome")
+genome_counts_caura = genome_counts_caura[,which(colnames(genome_counts_caura) %in% metadata_caura$sample)]
+genome_counts_caura = rownames_to_column(genome_counts_caura, "genome")
+
+beta_q1n_caura <- genome_counts_caura %>%
+  column_to_rownames(., "genome") %>%
+  filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
+  select_if(~!all(. == 0)) %>%
+  hillpair(., q = 1)
+
+#Neutral Divesity with C. atratus Fixed
+metadata_catratus = sample_metadata[which(sample_metadata$species == "Coragyps atratus"),]
+genome_counts_catratus = column_to_rownames(genome_counts_filt, "genome")
+genome_counts_catratus = genome_counts_catratus[,which(colnames(genome_counts_catratus) %in% metadata_catratus$sample)]
+genome_counts_catratus = rownames_to_column(genome_counts_catratus, "genome")
+
+beta_q1n_catratus <- genome_counts_catratus %>%
   column_to_rownames(., "genome") %>%
   filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
   select_if(~!all(. == 0)) %>%
@@ -357,9 +417,6 @@ beta_q1f <- genome_counts_filt %>%
   select_if(~!all(. == 0)) %>%
   hillpair(., q = 1, dist = dist)
 ```
-
-
-
 ## Richness diversity plot (Species)
 ```{r rich_div_species, warning=FALSE, comments="", message=FALSE}
 group_richness = sample_metadata[na.omit(match(sample_metadata$sample, names(beta_q0n$S))),]
@@ -393,7 +450,7 @@ beta_q0n$S %>%
 #+geom_text_repel(aes(label = sample), size=3)
 
 #Richness
-betadisper(beta_q0n$S, group$species) %>% permutest(., pairwise = TRUE) 
+betadisper(beta_q0n$S, group_richness$species) %>% permutest(., pairwise = TRUE) 
 
 adonis2(beta_q0n$S ~ species, 
         data = group_richness %>% arrange(match(sample,labels(beta_q0n$S))), 
@@ -513,28 +570,27 @@ beta_q0n$S %>%
 #Calculate dispersion and significance
 betadisper(beta_q0n$S, group_richness$state) %>% permutest(., pairwise = TRUE) 
 
-#betadisper(beta_q0n$C, sample_metadata_non0$state) %>% permutest(., pairwise = TRUE) 
+
 adonis2(beta_q0n$S ~ state, 
         data = group_richness %>% arrange(match(sample,labels(beta_q0n$S))), 
         permutations = 999) %>%
         broom::tidy() %>%
         tt()
 ```
-### Neutral Diversity (Species)
-``` {r neutral_div_species, warning=FALSE, comments="", message=FALSE}
-group_neutral = sample_metadata[na.omit(match(sample_metadata$sample, names(beta_q1n$S))),]
+### Neutral Diversity (Species, Colon Fixed)
+``` {r neutral_div_colon_species, warning=FALSE, comments="", message=FALSE}
+group_neutral = metadata_colon[na.omit(match(metadata_colon$sample, names(beta_q1n_colon$S))),]
 
-beta_q1n$S %>%
+beta_q1n_colon$S %>%
   vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
   vegan::scores() %>%
   as_tibble(., rownames = "sample") %>%
-  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
+  dplyr::left_join(metadata_colon, by = join_by(sample == sample)) %>%
   group_by(species) %>%
   mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
   mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
   ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = species#, fill = sample_type, shape = as.factor(sample_type)
-             )) +
+  ggplot(aes(x = NMDS1, y = NMDS2, color = species)) +
   geom_point(size = 4) +
   scale_color_manual(values = species_colors)+
   geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
@@ -548,17 +604,129 @@ beta_q1n$S %>%
     legend.position = "right", legend.box = "vertical"
     )
 
-betadisper(beta_q1n$S, group_neutral$species) %>% permutest(., pairwise = TRUE) 
+betadisper(beta_q1n_colon$S, group_neutral$species) %>% permutest(., pairwise = TRUE) 
 
-adonis2(beta_q1n$S ~ species, 
-        data = group_neutral %>% arrange(match(sample,labels(beta_q1n$S))), 
+adonis2(beta_q1n_colon$S ~ species, 
+        data = group_neutral %>% arrange(match(sample,labels(beta_q1n_colon$S))), 
         permutations = 999) %>%
         broom::tidy() %>%
         tt()
 
 ```
+
+### Neutral Diversity (Species, Stomach Fixed)
+``` {r neutral_div_stomach_species, warning=FALSE, comments="", message=FALSE}
+group_neutral = metadata_stomach[na.omit(match(metadata_stomach$sample, names(beta_q1n_stomach$S))),]
+
+beta_q1n_stomach$S %>%
+  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
+  vegan::scores() %>%
+  as_tibble(., rownames = "sample") %>%
+  dplyr::left_join(metadata_stomach, by = join_by(sample == sample)) %>%
+  group_by(species) %>%
+  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
+  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
+  ungroup() %>%
+  ggplot(aes(x = NMDS1, y = NMDS2, color = species)) +
+  geom_point(size = 4) +
+  scale_color_manual(values = species_colors)+
+  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    )
+
+betadisper(beta_q1n_stomach$S, group_neutral$species) %>% permutest(., pairwise = TRUE) 
+
+adonis2(beta_q1n_stomach$S ~ species, 
+        data = group_neutral %>% arrange(match(sample,labels(beta_q1n_stomach$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+
+```
+
+### Neutral Diversity (Sample Type, Cathartes aura Fixed)
+``` {r neutral_div_caura_sampletype, warning=FALSE, comments="", message=FALSE}
+group_neutral = metadata_caura[na.omit(match(metadata_caura$sample, names(beta_q1n_caura$S))),]
+
+beta_q1n_caura$S %>%
+  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
+  vegan::scores() %>%
+  as_tibble(., rownames = "sample") %>%
+  dplyr::left_join(metadata_caura, by = join_by(sample == sample)) %>%
+  group_by(sample_type) %>%
+  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
+  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
+  ungroup() %>%
+  ggplot(aes(x = NMDS1, y = NMDS2, color = sample_type)) +
+  geom_point(size = 4) +
+  scale_color_manual(values = sampletype_colors)+
+  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    )
+
+betadisper(beta_q1n_caura$S, group_neutral$sample_type) %>% permutest(., pairwise = TRUE) 
+
+adonis2(beta_q1n_caura$S ~ sample_type, 
+        data = group_neutral %>% arrange(match(sample,labels(beta_q1n_caura$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+
+```
+
+### Neutral Diversity (Sample Type, Coragyps atratus Fixed)
+``` {r neutral_div_ctratus_sampletype, warning=FALSE, comments="", message=FALSE}
+group_neutral = metadata_catratus[na.omit(match(metadata_catratus$sample, names(beta_q1n_catratus$S))),]
+
+beta_q1n_catratus$S %>%
+  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
+  vegan::scores() %>%
+  as_tibble(., rownames = "sample") %>%
+  dplyr::left_join(metadata_catratus, by = join_by(sample == sample)) %>%
+  group_by(sample_type) %>%
+  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
+  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
+  ungroup() %>%
+  ggplot(aes(x = NMDS1, y = NMDS2, color = sample_type)) +
+  geom_point(size = 4) +
+  scale_color_manual(values = sampletype_colors)+
+  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    )
+
+betadisper(beta_q1n_catratus$S, group_neutral$sample_type) %>% permutest(., pairwise = TRUE) 
+
+adonis2(beta_q1n_catratus$S ~ sample_type, 
+        data = group_neutral %>% arrange(match(sample,labels(beta_q1n_catratus$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+
+```
+
 ### Neutral Diversity (Sample Type)
-``` {r neutral_div_sample, warning=FALSE, comments="", message=FALSE}
+``` {r neutral_div_sample, warning=FALSE, comments="", message=FALSE, }
 group_neutral = sample_metadata[na.omit(match(sample_metadata$sample, names(beta_q1n$S))),]
 
 beta_q1n$S %>%
@@ -726,7 +894,7 @@ GIFTs_elements_community_no0 %>%
     pivot_longer(!sample,names_to="trait",values_to="gift") %>%
     left_join(sample_metadata, by = join_by(sample == sample)) %>%
 as.data.frame(GIFTs_elements_community_no0) %>%
-    mutate(functionid = substr(trait, 1, 3)) %>%
+    mutate(functionid = substr(trait, 1, 3)) %>% 
     mutate(trait = case_when(
       trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait, GIFT_db2$Code_element)],
       TRUE ~ trait
@@ -784,9 +952,166 @@ as.data.frame(GIFTs_elements_community_no0) %>%
 
 ```
 
+## Function Matrix of sample type (Cathartes aura fixed)
+```{r Function_Distance_Matrix_caura_sample }
+GIFTs_caura = GIFTs_elements_community_no0[which(rownames(GIFTs_elements_community_no0) %in% metadata_caura$sample),]
+
+dist_func = vegdist(GIFTs_caura, method ="bray" )
+
+group_neutral = metadata_caura[na.omit(match(metadata_caura$sample, names(beta_q1n_caura$S))),]
+
+adonis2(dist_func ~ group_neutral$sample_type, 
+        data = as.data.frame(GIFTs_caura) %>% arrange(match(group_neutral$sample,labels(beta_q1n_caura$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+betadisper(dist_func, group_neutral$sample_type) %>% permutest()
+
+set.seed(123)
+nmds_result <- metaMDS(dist_func, k = 2, trymax = 100)
+nmds_scores <- as.data.frame(nmds_result$points)
+
+#GIFT ordination by sample type
+nmds_scores$Group <- group_neutral$sample_type
+
+x_cen = mean(nmds_scores$MDS1, na.rm = TRUE)
+y_cen = mean(nmds_scores$MDS2, na.rm = TRUE)
+ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
+  geom_point(size = 4) +
+  scale_color_manual(values = sampletype_colors) +
+  geom_segment(aes(x = x_cen, y = y_cen, xend = MDS1, yend = MDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    )
+```
+
+## Function Matrix of sample type (Coragyps atratus fixed)
+```{r Function_Distance_Matrix_catratus_sample }
+GIFTs_catratus = GIFTs_elements_community_no0[which(rownames(GIFTs_elements_community_no0) %in% metadata_catratus$sample),]
+
+dist_func = vegdist(GIFTs_catratus, method ="bray" )
+
+group_neutral = metadata_catratus[na.omit(match(metadata_catratus$sample, names(beta_q1n_catratus$S))),]
+
+adonis2(dist_func ~ group_neutral$sample_type, 
+        data = as.data.frame(GIFTs_catratus) %>% arrange(match(group_neutral$sample,labels(beta_q1n_catratus$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+betadisper(dist_func, group_neutral$sample_type) %>% permutest()
+
+set.seed(123)
+nmds_result <- metaMDS(dist_func, k = 2, trymax = 100)
+nmds_scores <- as.data.frame(nmds_result$points)
+
+#GIFT ordination by sample type
+nmds_scores$Group <- group_neutral$sample_type
+
+x_cen = mean(nmds_scores$MDS1, na.rm = TRUE)
+y_cen = mean(nmds_scores$MDS2, na.rm = TRUE)
+ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
+  geom_point(size = 4) +
+  scale_color_manual(values = sampletype_colors) +
+  geom_segment(aes(x = x_cen, y = y_cen, xend = MDS1, yend = MDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    )
+
+```
+## Function Matrix of species (Colon Contents fixed)
+```{r Function_Distance_Matrix_colon_species }
+GIFTs_colon = GIFTs_elements_community_no0[which(rownames(GIFTs_elements_community_no0) %in% metadata_colon$sample),]
+
+dist_func = vegdist(GIFTs_colon, method ="bray" )
+
+group_neutral = metadata_colon[na.omit(match(metadata_colon$sample, names(beta_q1n_colon$S))),]
+
+adonis2(dist_func ~ group_neutral$species, 
+        data = as.data.frame(GIFTs_colon) %>% arrange(match(group_neutral$sample,labels(beta_q1n_colon$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+betadisper(dist_func, group_neutral$species) %>% permutest()
+
+set.seed(123)
+nmds_result <- metaMDS(dist_func, k = 2, trymax = 100)
+nmds_scores <- as.data.frame(nmds_result$points)
+
+#GIFT ordination by species
+nmds_scores$Group <- group_neutral$species
+
+x_cen = mean(nmds_scores$MDS1, na.rm = TRUE)
+y_cen = mean(nmds_scores$MDS2, na.rm = TRUE)
+ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
+  geom_point(size = 4) +
+  scale_color_manual(values = species_colors) +
+  geom_segment(aes(x = x_cen, y = y_cen, xend = MDS1, yend = MDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    )
+```
+## Function Matrix of species (Stomach Contents fixed)
+```{r Function_Distance_Matrix_stomach_species }
+GIFTs_stomach = GIFTs_elements_community_no0[which(rownames(GIFTs_elements_community_no0) %in% metadata_stomach$sample),]
+
+dist_func = vegdist(GIFTs_stomach, method ="bray" )
+
+group_neutral = metadata_stomach[na.omit(match(metadata_stomach$sample, names(beta_q1n_stomach$S))),]
+
+adonis2(dist_func ~ group_neutral$species, 
+        data = as.data.frame(GIFTs_stomach) %>% arrange(match(group_neutral$sample,labels(beta_q1n_stomach$S))), 
+        permutations = 999) %>%
+        broom::tidy() %>%
+        tt()
+betadisper(dist_func, group_neutral$species) %>% permutest()
+
+set.seed(123)
+nmds_result <- metaMDS(dist_func, k = 2, trymax = 100)
+nmds_scores <- as.data.frame(nmds_result$points)
+
+#GIFT ordination by species
+nmds_scores$Group <- group_neutral$species
+
+x_cen = mean(nmds_scores$MDS1, na.rm = TRUE)
+y_cen = mean(nmds_scores$MDS2, na.rm = TRUE)
+ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
+  geom_point(size = 4) +
+  scale_color_manual(values = species_colors) +
+  geom_segment(aes(x = x_cen, y = y_cen, xend = MDS1, yend = MDS2), alpha = 0.9) +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.position = "right", legend.box = "vertical"
+    )
+```
+
 ### Function Matrix 
 ```{r Function_Distance_Matrix }
 dist_func = vegdist(GIFTs_elements_community_no0, method ="bray" )
+
+group_neutral = metadata_caura[na.omit(match(metadata_caura$sample, names(beta_q1n_caura$S))),]
 adonis2(dist_func ~ group_neutral$species, 
         data = as.data.frame(GIFTs_elements_community_no0) %>% arrange(match(group_neutral$sample,labels(beta_q1n$S))), 
         permutations = 999) %>%
@@ -842,15 +1167,80 @@ ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
     legend.position = "right", legend.box = "vertical"
     )
 ```
+### Differential Abundance of Bacteria by Sample Type (Cathartes aura fixed)
+```{r ancom_caura_sampletype, warning=FALSE}
+phylo_metadata_caura = metadata_caura
+phylo_metadata_caura = data.frame(phylo_metadata_caura)
+rownames(phylo_metadata_caura) = phylo_metadata_caura[,1]
+phylo_metadata_caura = phylo_metadata_caura[,-1]
+phylo_metadata_caura = sample_data(phylo_metadata_caura)
+
+#phylo_var_caura <- apply(genome_counts_caura[-1], 1, var)
+#genome_counts_caura_filt <- genome_counts_caura[phylo_var_caura > 0, ]
+
+#prevalence <- rowSums(genome_counts_caura_filt > 0) / ncol(genome_counts_caura_filt)
+#genome_counts_caura_filt <- genome_counts_caura_filt[prevalence > 0.1, ]
+
+phylo_mag_caura = otu_table(genome_counts_caura[-1], taxa_are_rows=TRUE)
+
+mag_table = phyloseq(phylo_mag_caura, phylo_metadata_caura)
+
+res <- ancombc2(
+  data = mag_table,
+  fix_formula = "sample_type",
+  p_adj_method = "holm",
+  lib_cut = 20,
+  group = "sample_type",
+  struc_zero = TRUE,
+  neg_lb = TRUE,
+  alpha = 0.05,
+  global = FALSE,
+  verbose = TRUE
+)
+
+# View results
+lfc_res <- as.data.frame(res$res$taxon)
+colnames(lfc_res)[1] = "Function"
+rownames(lfc_res) = lfc_res$Function
+lfc_res$Function = NULL
+
+lfc_res = mutate(lfc_res, lfc = res$res$'lfc_sample_typeStomach contents')
+lfc_res = mutate(lfc_res, p_val = res$res$'p_sample_typeStomach contents')
+
+# See significant taxa
+sig_taxa_sample = filter(lfc_res, p_val < 0.05)
+print(sig_taxa_sample)
+sig_taxa_sample$genome = rownames(sig_taxa_sample)
+
+sig_taxa_sample = merge(sig_taxa_sample, genome_metadata, by = "genome")
+sig_taxa_sample$signif_label <- cut(sig_taxa_sample$p_val, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", ""))
+
+# Bar plot of significant taxa (ordered by log fold change)
+ggplot(sig_taxa_sample, aes(x = reorder(genome, lfc), y = lfc, fill = lfc > 0)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = signif_label), hjust = ifelse(sig_taxa_sample$lfc > 0, -0.2, 1.2), color = "black", size = 4) +
+  coord_flip() +
+  scale_fill_manual(values = sampletype_colors, labels = c("Colon Contents", "Stomach Contents")) +
+  theme_minimal() +
+  labs(
+    x = "MAG",
+    y = "Log Fold Change",
+    title = "Enrichment of Significant Taxa",
+    fill = "More abundant in"
+  ) +
+  theme(axis.text.x = element_text(hjust = 1))
+
+```
+
 ### Differential Abundance of Bacteria by Sample Type
 ```{r ancom_sampletype, warning=FALSE}
-phylo_metadata = sample_metadata_non0
+phylo_metadata = sample_metadata
 phylo_metadata = data.frame(phylo_metadata)
 rownames(phylo_metadata) = phylo_metadata[,1]
 phylo_metadata = phylo_metadata[,-1]
 phylo_metadata = sample_data(phylo_metadata)
 
-phylo_mag = otu_table(genome_counts_non0, taxa_are_rows=TRUE)
+phylo_mag = otu_table(genome_counts[-1], taxa_are_rows=TRUE)
 
 mag_table = phyloseq(phylo_mag, phylo_metadata)
 
@@ -882,39 +1272,35 @@ print(sig_taxa_sample)
 sig_taxa_sample$genome = rownames(sig_taxa_sample)
 
 sig_taxa_sample = merge(sig_taxa_sample, genome_metadata, by = "genome")
-sig_taxa_sample$signif_label <- cut(sig_taxa_sample$p_val,
-                                     breaks = c(-Inf, 0.001, 0.01, 0.05, Inf),
-                                     labels = c("***", "**", "*", ""))
+sig_taxa_sample$signif_label <- cut(sig_taxa_sample$p_val, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", ""))
 
 # Bar plot of significant taxa (ordered by log fold change)
-ggplot(sig_taxa_sample, aes(x = reorder(phylum, lfc), y = lfc, fill = lfc > 0)) +
+ggplot(sig_taxa_sample, aes(x = reorder(genome, lfc), y = lfc, fill = lfc > 0)) +
   geom_bar(stat = "identity", position = "dodge") +
-  geom_text(aes(label = signif_label), 
-            hjust = ifelse(sig_taxa_sample$lfc > 0, -0.2, 1.2), 
-            color = "black", 
-            size = 4) +
+  geom_text(aes(label = signif_label), hjust = ifelse(sig_taxa_sample$lfc > 0, -0.2, 1.2), color = "black", size = 4) +
   coord_flip() +
-  scale_fill_manual(values = sampletype_colors,
-                    labels = c("Colon Contents", "Stomach Contents")) +
+  scale_fill_manual(values = sampletype_colors, labels = c("Colon Contents", "Stomach Contents")) +
   theme_minimal() +
   labs(
-    x = "Family",
+    x = "MAG",
     y = "Log Fold Change",
     title = "Enrichment of Significant Taxa",
     fill = "More abundant in"
   ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(hjust = 1))
 
 ```
 ### Differential Abundance of Bacteria by Species
 ```{r ancom_species, warning=FALSE}
-phylo_metadata = sample_metadata_non0
+phylo_metadata = sample_metadata
 phylo_metadata = data.frame(phylo_metadata)
 rownames(phylo_metadata) = phylo_metadata[,1]
 phylo_metadata = phylo_metadata[,-1]
 phylo_metadata = sample_data(phylo_metadata)
 
-phylo_mag = otu_table(genome_counts_non0, taxa_are_rows=TRUE)
+genome_counts_filt = column_to_rownames(genome_counts_filt, var = "genome")
+
+phylo_mag = otu_table(genome_counts_filt, taxa_are_rows=TRUE)
 
 mag_table = phyloseq(phylo_mag, phylo_metadata)
 
@@ -951,7 +1337,7 @@ sig_taxa_species$signif_label <- cut(sig_taxa_species$p_val,
                                      labels = c("***", "**", "*", ""))
 
 # Bar plot of significant taxa (ordered by log fold change)
-ggplot(sig_taxa_species, aes(x = reorder(phylum, lfc), y = lfc, fill = lfc > 0)) +
+ggplot(sig_taxa_species, aes(x = reorder(genome, lfc), y = lfc, fill = lfc > 0)) +
   geom_bar(stat = "identity", position = "dodge") +
   geom_text(aes(label = signif_label), 
             hjust = ifelse(sig_taxa_species$lfc > 0, -0.2, 1.2), 
@@ -962,17 +1348,17 @@ ggplot(sig_taxa_species, aes(x = reorder(phylum, lfc), y = lfc, fill = lfc > 0))
                     labels = c("Cathartes aura", "Coragyps atratus")) +
   theme_minimal() +
   labs(
-    x = "Family",
+    x = "MAG",
     y = "Log Fold Change",
     title = "Enrichment of Significant Taxa",
     fill = "More abundant in"
   ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(hjust = 1))
 
 ```
 
 
-### Wilcoxon comparison
+### GIFT Wilcoxon Comparison (GI Location)
 ```{r community_elem, comment="", message=FALSE, warning=FALSE, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
 element_gift <- GIFTs_elements_community_no0 %>% 
   as.data.frame() %>% 
@@ -1012,8 +1398,7 @@ sig_wilcox_sample = element_gift %>%
       TRUE ~ ""
     ),
     trait_label = paste0(trait_name, " ", p_label)  # Append p-values to trait name
-  ) %>%
-  filter(p_adjust < 0.01) #Keep only significant results
+  ) # %>% filter(p_adjust < 0.01) #Keep only significant results
   
 
 #Match significant functions to table
@@ -1048,15 +1433,106 @@ ggplot(heatmap_data, aes(x=sample, y=paste0(trait, " ", sig_wilcox_sample$p_labe
 
 
 ```
-### Volcano Plot
-```{r community_elem_volcano, comment="", message=FALSE, warning=FALSE, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
-sig_wilcox_sample$negLogP <- -log10(sig_wilcox_sample$p_adjust)
+### GIFT Wilcoxon Comparison (GI Location)
+```{r community_elem, comment="", message=FALSE, warning=FALSE, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
+element_gift <- GIFTs_elements_community_no0 %>% 
+  as.data.frame() %>% 
+  rownames_to_column(., "sample") %>% 
+  #Change column number to column in sample_metadata to change comparison sample_type, species, etc
+  left_join(sample_metadata[c(1,3)], by="sample")
+comparison = colnames(element_gift)[length(colnames(element_gift))]
+
+uniqueGIFT_db<- unique(GIFT_db2) %>% unite("Function",Function:Element, sep= "_", remove=FALSE)
+
+#Wilcoxan test
+sig_wilcox_species = element_gift %>%
+  pivot_longer(-c(sample, comparison), names_to = "trait", values_to = "value") %>%
+  group_by(trait) %>%
+  summarise(
+    p_value = wilcox.test(value ~ get(comparison))$p.value,
+    mean_1 = mean(value[get(comparison) == unique(element_gift[,comparison])[1]], na.rm = TRUE),
+    mean_2 = mean(value[get(comparison) == unique(element_gift[,comparison])[2]], na.rm = TRUE),
+    mean_difference = mean_1 - mean_2,  # Magnitude of difference
+    direction = case_when(
+      mean_difference > 0 ~ paste("Higher in", unique(element_gift[,comparison])[1]),
+      mean_difference < 0 ~ paste("Higher in", unique(element_gift[,comparison])[2]),
+      TRUE ~ "No Difference"
+    )
+  ) %>%
+  mutate(trait_name = trait) %>%
+  mutate(trait_name = case_when(
+      trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait_name, GIFT_db2$Code_element)],
+      TRUE ~ trait_name
+    )) %>%
+  mutate(
+    p_adjust = p.adjust(p_value, method = "BH"),
+    p_label = case_when(
+      p_adjust < 0.001 ~ "***",
+      p_adjust < 0.01  ~ "**",
+      p_adjust < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+    trait_label = paste0(trait_name, " ", p_label)  # Append p-values to trait name
+  ) # %>% filter(p_adjust < 0.01) #Keep only significant results
+  
+
+#Match significant functions to table
+wilcox_elements_community_no0_sig = GIFTs_elements_community_no0[,which(match(colnames(GIFTs_elements_community_no0), sig_wilcox_species$trait)>0)]
+
+#Create table of gift scores with significant differences between comparisons
+heatmap_data <- wilcox_elements_community_no0_sig %>%
+    as.data.frame() %>%
+    rownames_to_column(var="sample") %>%
+    pivot_longer(!sample, names_to="trait", values_to="gift") %>%
+    left_join(sample_metadata, by = join_by(sample == sample)) %>%
+    mutate(functionid = substr(trait, 1, 3)) %>%
+    mutate(trait = case_when(
+      trait %in% GIFT_db2$Code_element ~ GIFT_db2$Element[match(trait, GIFT_db2$Code_element)],
+      TRUE ~ trait
+    )) %>%
+    mutate(functionid = case_when(
+      functionid %in% GIFT_db2$Code_function ~ GIFT_db2$Function[match(functionid, GIFT_db2$Code_function)],
+      TRUE ~ functionid
+    )) %>%
+    left_join(sig_wilcox_sample %>% select(trait, trait_label, mean_difference, direction, p_adjust), by="trait") %>%
+    mutate(trait_label = factor(trait_label, levels = unique(trait_label))) %>%
+    mutate(functionid = factor(functionid, levels = unique(GIFT_db2$Function)))
+
+ggplot(heatmap_data, aes(x=sample, y=paste0(trait, " ", sig_wilcox_species$p_label), fill=gift)) +  
+    geom_tile(colour="white", linewidth=0.2) +  
+    scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) +  
+    facet_nested(functionid ~ get(comparison) + sample_type, scales="free", space="free") +  
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          strip.text.y = element_text(angle = 0), axis.text.y = element_text(angle=45, size=10)) + 
+    labs(y="Functional Attribute (with p-values)", x="Samples", fill="GIFT")
+
+
+```
+### Volcano Plot (GI Location)
+```{r community_elem_volcano, comment="", message=FALSE, warning=FALSE, fig.height=6, fig.width=10, fig.fullwidth=TRUE}
+sig_wilcox_sample$negLogP = -log10(sig_wilcox_sample$p_adjust)
 
 ggplot(sig_wilcox_sample, aes(x = mean_difference, y = negLogP)) +
-  geom_point(aes(), alpha = 0.7) +  # Highlight significant points
+  geom_point(aes(color = negLogP > 1.3), alpha = 0.7) +  # Highlight significant points
   geom_text_repel(aes(label = trait_name), size = 3, max.overlaps = 10) +  # Avoid too many overlapping labels
   theme_minimal() +
   labs(x = "GIFT Difference",
-       y = "-Log10(P-value)") +
+       y = "Significance (-Log10(P-value))", 
+       color = "Significant (p>0.05)") +
+  scale_color_manual(values = c("TRUE" = "forestgreen", "FALSE" = "lightgray")) +
+  theme(plot.title = element_text(hjust = 0.5))  # Center title
+```
+### Volcano Plot (Species)
+```{r community_elem_volcano, comment="", message=FALSE, warning=FALSE, fig.height=6, fig.width=10, fig.fullwidth=TRUE}
+sig_wilcox_species$negLogP = -log10(sig_wilcox_species$p_adjust)
+
+ggplot(sig_wilcox_species, aes(x = mean_difference, y = negLogP)) +
+  geom_point(aes(color = negLogP > 1.3), alpha = 0.7) +  # Highlight significant points
+  geom_text_repel(aes(label = trait_name), size = 3, max.overlaps = 10) +  # Avoid too many overlapping labels
+  theme_minimal() +
+  labs(x = "GIFT Difference",
+       y = "Significance (-Log10(P-value))", 
+       color = "Significant (p>0.05)") +
+  scale_color_manual(values = c("TRUE" = "forestgreen", "FALSE" = "lightgray")) +
   theme(plot.title = element_text(hjust = 0.5))  # Center title
 ```
