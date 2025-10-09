@@ -17,7 +17,6 @@ individuals = read.csv("vulture_individuals.csv")
 sample_metadata$state = substr(word(sample_metadata$region),1,nchar(word(sample_metadata$region))-1)
 #Join sample number with metadata
 sample_metadata = left_join(sample_metadata, individuals, by = "sample")
-
 ```
 
 ### Read counts
@@ -25,6 +24,7 @@ sample_metadata = left_join(sample_metadata, individuals, by = "sample")
 ```{r load_read_counts, warning=FALSE, comments="", message=FALSE}
 read_counts <- read_tsv("data/DMB0117_counts.tsv.gz") %>%
     rename(genome=1)
+read_counts = read_counts[,-which(match(colnames(read_counts), removed_samples)!=0)]
 ```
 
 ### Genome base hits
@@ -32,6 +32,7 @@ read_counts <- read_tsv("data/DMB0117_counts.tsv.gz") %>%
 ```{r load_genome_hits, warning=FALSE, comments="", message=FALSE}
 genome_coverage <- read_tsv("data/DMB0117_coverage.tsv.gz") %>%
     rename(genome=1)
+genome_coverage = genome_coverage[,-which(match(colnames(genome_coverage), removed_samples)!=0)]
 ```
 
 ### Genome taxonomy
@@ -39,6 +40,8 @@ genome_coverage <- read_tsv("data/DMB0117_coverage.tsv.gz") %>%
 ```{r load_genome_metadata, warning=FALSE, comments="", message=FALSE}
 genome_metadata <- read_tsv("data/DMB0117_mag_info.tsv.gz") %>%
     rename(length=mag_size)
+
+genome_summary = genome_metadata
 ```
 
 ### Genome tree
@@ -94,6 +97,12 @@ genome_counts <- read_counts %>%
 readlength=150
 genome_counts_filt <- read_counts_filt %>%
   mutate(across(where(is.numeric), ~ . / (genome_metadata$length / readlength) ))
+genome_counts_filt = column_to_rownames(genome_counts_filt, "genome")
+genome_counts_filt = genome_counts_filt[,-c(which(colSums(genome_counts_filt)==0))]
+genome_counts_filt = rownames_to_column(genome_counts_filt, "genome")
+
+#Remove samples with 0 counts of MAGs
+sample_metadata = sample_metadata[match(colnames(genome_counts_filt)[-1], sample_metadata$sample),]
 ```
 
 
@@ -109,8 +118,6 @@ genome_gifts <- distill(genome_annotations,GIFT_db2,genomecol=2,annotcol=c(9,10,
 
 ```{r get_ehi_colors, warning=FALSE, comments="", message=FALSE}
 colors = read_tsv("https://raw.githubusercontent.com/earthhologenome/EHI_taxonomy_colour/main/ehi_phylum_colors.tsv")
-#Put colorblind friendly colors and non overlapping colors into the EHI colors
-#colors[match(c("p__Actinomycetota", "p__Bacillota", "p__Bacillota_A", "p__Bacillota_B", "p__Bacillota_C", "p__Bacteroidota", "p__Campylobacterota", "p__Chlamydiota", "p__Deferribacterota", "p__Desulfobacterota", "p__Fusobacteriota", "p__Pseudomonadota"), colors$phylum), 2] = c("#c8c8c8", "#f0c571", "#59a89c", "#d47264", "#e25759", "#9d2c00", "#7E4794", "#36b700", "#00317e", "#008dff", "#c701ff", "#0d0d0d")
 phylum_colors <- colors %>%
     right_join(genome_metadata, by=join_by(phylum == phylum)) %>%
     arrange(match(genome, genome_tree$tip.label)) %>%
@@ -118,16 +125,11 @@ phylum_colors <- colors %>%
     unique() %>%
     arrange(phylum) %>%
     pull(colors, name=phylum)
-#picking new color blind friendly and non overlapping colors for phyla
-#phylum_colors[]=c("#c8c8c8", "#f0c571", "#59a89c", "#d47264", "#e25759", "#9d2c00", "#7E4794", "#36b700", "#00317e", "#008dff", "#c701ff", "#0d0d0d")
-
 #Colors for samples
 species_colors = c("#d83034", "#0d0d0d")
 sampletype_colors = c("#f45f74", "#008dff")
 sex_colors = c("#bdd373", "#003a7d")
 state_colors = c("#D55E00", "#CC79A7")
-
-
 
 ```
 

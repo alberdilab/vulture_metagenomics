@@ -5,26 +5,26 @@
   <meta charset="utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <title>AlberdiLab | Chao et al. in prep</title>
-  <meta name="description" content="&lt;p&gt;Data analysis code for the study on the study of gut microbiomes of newts across ponds included in a restoration plan.&lt;/p&gt;" />
-  <meta name="generator" content="bookdown 0.37 and GitBook 2.6.7" />
+  <meta name="description" content="&lt;p&gt;Data analysis code for the study on the study of gut microbiomes of common north american vultures.&lt;/p&gt;" />
+  <meta name="generator" content="bookdown 0.40 and GitBook 2.6.7" />
 
   <meta property="og:title" content="AlberdiLab | Chao et al. in prep" />
   <meta property="og:type" content="book" />
   
-  <meta property="og:description" content="&lt;p&gt;Data analysis code for the study on the study of gut microbiomes of newts across ponds included in a restoration plan.&lt;/p&gt;" />
+  <meta property="og:description" content="&lt;p&gt;Data analysis code for the study on the study of gut microbiomes of common north american vultures.&lt;/p&gt;" />
   <meta name="github-repo" content="alberdilab/vulture_metagenomics" />
 
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="AlberdiLab | Chao et al. in prep" />
   
-  <meta name="twitter:description" content="&lt;p&gt;Data analysis code for the study on the study of gut microbiomes of newts across ponds included in a restoration plan.&lt;/p&gt;" />
+  <meta name="twitter:description" content="&lt;p&gt;Data analysis code for the study on the study of gut microbiomes of common north american vultures.&lt;/p&gt;" />
   
 
 <meta name="author" content="Jasper Chao" />
 <meta name="author" content="Antton Alberdi" />
 
 
-<meta name="date" content="2024-03-31" />
+<meta name="date" content="2025-04-25" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -1876,7 +1876,7 @@ a.anchor-section::before {content: '#';font-size: 80%;}
 
 <style type="text/css">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -1886,7 +1886,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -2070,14 +2070,46 @@ color: #a52929;
 </ul></li>
 <li class="chapter" data-level="5" data-path="compositional-analysis.html"><a href="compositional-analysis.html"><i class="fa fa-check"></i><b>5</b> Compositional analysis</a>
 <ul>
-<li class="chapter" data-level="5.0.1" data-path="compositional-analysis.html"><a href="compositional-analysis.html#taxonomy-barplot-per-individual"><i class="fa fa-check"></i><b>5.0.1</b> Taxonomy barplot per individual</a></li>
-<li class="chapter" data-level="5.1" data-path="compositional-analysis.html"><a href="compositional-analysis.html#taxonomy-boxplot"><i class="fa fa-check"></i><b>5.1</b> Taxonomy boxplot</a>
+<li class="chapter" data-level="5.1" data-path="compositional-analysis.html"><a href="compositional-analysis.html#taxonomy"><i class="fa fa-check"></i><b>5.1</b> Taxonomy</a>
 <ul>
-<li class="chapter" data-level="5.1.1" data-path="compositional-analysis.html"><a href="compositional-analysis.html#family"><i class="fa fa-check"></i><b>5.1.1</b> Family</a></li>
-<li class="chapter" data-level="5.1.2" data-path="compositional-analysis.html"><a href="compositional-analysis.html#genus"><i class="fa fa-check"></i><b>5.1.2</b> Genus</a></li>
+<li class="chapter" data-level="5.1.1" data-path="compositional-analysis.html"><a href="compositional-analysis.html#abundance-barplot-per-individual"><i class="fa fa-check"></i><b>5.1.1</b> Abundance barplot per individual</a></li>
+<li class="chapter" data-level="5.1.2" data-path="compositional-analysis.html"><a href="compositional-analysis.html#abundance-barplot-per-individual-by-sample-type"><i class="fa fa-check"></i><b>5.1.2</b> Abundance barplot per individual by sample type</a></li>
+<li class="chapter" data-level="5.1.3" data-path="compositional-analysis.html"><a href="compositional-analysis.html#dominant-phyla"><i class="fa fa-check"></i><b>5.1.3</b> Dominant Phyla</a></li>
+<li class="chapter" data-level="5.1.4" data-path="compositional-analysis.html"><a href="compositional-analysis.html#unique-mags"><i class="fa fa-check"></i><b>5.1.4</b> Unique MAGs</a></li>
 </ul></li>
-<li class="chapter" data-level="5.2" data-path="compositional-analysis.html"><a href="compositional-analysis.html#alpha-diversity"><i class="fa fa-check"></i><b>5.2</b> Alpha diversity</a></li>
-<li class="chapter" data-level="5.3" data-path="compositional-analysis.html"><a href="compositional-analysis.html#beta-diversity"><i class="fa fa-check"></i><b>5.3</b> Beta diversity</a></li>
+<li class="chapter" data-level="5.2" data-path="compositional-analysis.html"><a href="compositional-analysis.html#summary-family"><i class="fa fa-check"></i><b>5.2</b> Summary Family</a>
+<ul>
+<li class="chapter" data-level="5.2.1" data-path="compositional-analysis.html"><a href="compositional-analysis.html#jitterplot-family"><i class="fa fa-check"></i><b>5.2.1</b> Jitterplot Family</a></li>
+</ul></li>
+<li class="chapter" data-level="5.3" data-path="compositional-analysis.html"><a href="compositional-analysis.html#summary-genus"><i class="fa fa-check"></i><b>5.3</b> Summary Genus</a>
+<ul>
+<li class="chapter" data-level="5.3.1" data-path="compositional-analysis.html"><a href="compositional-analysis.html#jitterplot-genus"><i class="fa fa-check"></i><b>5.3.1</b> Jitterplot Genus</a></li>
+</ul></li>
+<li class="chapter" data-level="5.4" data-path="compositional-analysis.html"><a href="compositional-analysis.html#alpha-diversity"><i class="fa fa-check"></i><b>5.4</b> Alpha diversity</a>
+<ul>
+<li class="chapter" data-level="5.4.1" data-path="compositional-analysis.html"><a href="compositional-analysis.html#calculate-hill-numbers"><i class="fa fa-check"></i><b>5.4.1</b> Calculate Hill Numbers</a></li>
+<li class="chapter" data-level="5.4.2" data-path="compositional-analysis.html"><a href="compositional-analysis.html#plot-alpha-diversity"><i class="fa fa-check"></i><b>5.4.2</b> Plot Alpha Diversity</a></li>
+</ul></li>
+<li class="chapter" data-level="5.5" data-path="compositional-analysis.html"><a href="compositional-analysis.html#beta-diversity"><i class="fa fa-check"></i><b>5.5</b> Beta diversity</a></li>
+<li class="chapter" data-level="5.6" data-path="compositional-analysis.html"><a href="compositional-analysis.html#richness-diversity-plot-species"><i class="fa fa-check"></i><b>5.6</b> Richness diversity plot (Species)</a>
+<ul>
+<li class="chapter" data-level="5.6.1" data-path="compositional-analysis.html"><a href="compositional-analysis.html#richness-diversity-plot-sample-type"><i class="fa fa-check"></i><b>5.6.1</b> Richness diversity plot (Sample Type)</a></li>
+<li class="chapter" data-level="5.6.2" data-path="compositional-analysis.html"><a href="compositional-analysis.html#richness-diversity-plot-sex"><i class="fa fa-check"></i><b>5.6.2</b> Richness diversity plot (Sex)</a></li>
+<li class="chapter" data-level="5.6.3" data-path="compositional-analysis.html"><a href="compositional-analysis.html#richness-diversity-plot-state"><i class="fa fa-check"></i><b>5.6.3</b> Richness diversity plot (State)</a></li>
+<li class="chapter" data-level="5.6.4" data-path="compositional-analysis.html"><a href="compositional-analysis.html#neutral-diversity-species"><i class="fa fa-check"></i><b>5.6.4</b> Neutral Diversity (Species)</a></li>
+<li class="chapter" data-level="5.6.5" data-path="compositional-analysis.html"><a href="compositional-analysis.html#neutral-diversity-sample-type"><i class="fa fa-check"></i><b>5.6.5</b> Neutral Diversity (Sample Type)</a></li>
+<li class="chapter" data-level="5.6.6" data-path="compositional-analysis.html"><a href="compositional-analysis.html#neutral-diversity-sex"><i class="fa fa-check"></i><b>5.6.6</b> Neutral Diversity (Sex)</a></li>
+<li class="chapter" data-level="5.6.7" data-path="compositional-analysis.html"><a href="compositional-analysis.html#neutral-diversity-state"><i class="fa fa-check"></i><b>5.6.7</b> Neutral Diversity (State)</a></li>
+</ul></li>
+<li class="chapter" data-level="5.7" data-path="compositional-analysis.html"><a href="compositional-analysis.html#functional-differences"><i class="fa fa-check"></i><b>5.7</b> Functional Differences</a>
+<ul>
+<li class="chapter" data-level="5.7.1" data-path="compositional-analysis.html"><a href="compositional-analysis.html#calculate-gift-scores"><i class="fa fa-check"></i><b>5.7.1</b> Calculate GIFT Scores</a></li>
+<li class="chapter" data-level="5.7.2" data-path="compositional-analysis.html"><a href="compositional-analysis.html#functional-level"><i class="fa fa-check"></i><b>5.7.2</b> Functional Level</a></li>
+<li class="chapter" data-level="5.7.3" data-path="compositional-analysis.html"><a href="compositional-analysis.html#element-level"><i class="fa fa-check"></i><b>5.7.3</b> Element Level</a></li>
+<li class="chapter" data-level="5.7.4" data-path="compositional-analysis.html"><a href="compositional-analysis.html#element-level-individual-functions"><i class="fa fa-check"></i><b>5.7.4</b> Element Level Individual functions</a></li>
+<li class="chapter" data-level="5.7.5" data-path="compositional-analysis.html"><a href="compositional-analysis.html#function-matrix"><i class="fa fa-check"></i><b>5.7.5</b> Function Matrix</a></li>
+<li class="chapter" data-level="5.7.6" data-path="compositional-analysis.html"><a href="compositional-analysis.html#wilcoxon-comparison"><i class="fa fa-check"></i><b>5.7.6</b> Wilcoxon comparison</a></li>
+</ul></li>
 </ul></li>
 <li class="divider"></li>
 <li><a href="https://www.alberdilab.dk" target="blank"><b>www.alberdilab.dk</b></a></li>
@@ -2104,9 +2136,9 @@ color: #a52929;
 <div id="header">
 <h1 class="title">AlberdiLab | Chao et al. in prep</h1>
 <h2 class="subtitle"><em>New world vulture metagenomics</em></h2>
-<p class="author"><em>Jasper Chao</em></p>
-<p class="author"><em>Antton Alberdi<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a></em></p>
-<p class="date"><em>2024-03-31</em></p>
+<p class="author"><em>Jasper Chao<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a></em></p>
+<p class="author"><em>Antton Alberdi<a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a></em></p>
+<p class="date"><em>2025-04-25</em></p>
 </div>
 <div id="introduction" class="section level1 hasAnchor" number="1">
 <h1><span class="header-section-number">Chapter 1</span> Introduction<a href="index.html#introduction" class="anchor-section" aria-label="Anchor link to header"></a></h1>
@@ -2165,7 +2197,8 @@ color: #a52929;
 <div class="footnotes">
 <hr />
 <ol start="1">
-<li id="fn1"><p>University of Copenhagen, <a href="mailto:antton.alberdi@sund.ku.dk" class="email">antton.alberdi@sund.ku.dk</a><a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+<li id="fn1"><p>The Pennsylvania State University, <a href="mailto:juc5011@psu.edu" class="email">juc5011@psu.edu</a><a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+<li id="fn2"><p>University of Copenhagen, <a href="mailto:antton.alberdi@sund.ku.dk" class="email">antton.alberdi@sund.ku.dk</a><a href="#fnref2" class="footnote-back">↩︎</a></p></li>
 </ol>
 </div>
             </section>

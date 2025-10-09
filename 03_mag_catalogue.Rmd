@@ -76,6 +76,16 @@ genome_metadata %>%
     tt()
 ```
 
+```{r completeness_plot}
+ggplot(genome_metadata, aes(x = reorder(genome, -completeness), y = completeness)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Genome Completeness",
+       x = "MAG",
+       y = "Completeness (%)") +
+  theme_minimal()
+```
+
 ```{r genome_quality_plot, message=FALSE, warning=FALSE, fig.height=8, fig.width=10, fig.fullwidth=TRUE}
 
 #Generate quality biplot

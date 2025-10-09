@@ -15,6 +15,8 @@ sample_metadata %>%
     tt()
 ```
 
+
+
 ## DNA fractions
 ```{r dna_fractions_stats}
 sequence_fractions <- read_counts %>%
@@ -52,10 +54,75 @@ sequence_fractions %>%
 	    theme_classic() +
 	    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size=6),legend.position = "bottom")
 ```
+```{r summary_stats}
+#Read Length
+#Minimum read length
+min_read = min(sequence_fractions$mags_bases)
+min_read
+min_row = which(match(sample_metadata$sample, sequence_fractions$sample[which(match(sequence_fractions$mags_bases, min(sequence_fractions$mags_bases))==1)])==1)
+sample_metadata[min_row,c(1,3,5,7,20)]
+
+#Minimum read length
+max_read = max(sequence_fractions$mags_bases)
+max_read
+max_row = which(match(sample_metadata$sample, sequence_fractions$sample[which(match(sequence_fractions$mags_bases, min(sequence_fractions$mags_bases))==1)])==1)
+sample_metadata[min_row,c(1,3,5,7,20)]
+
+#Completeness
+#Average
+mean(genome_metadata$completeness)
+#Standard Deviation
+sd(genome_metadata$completeness)
+
+#Contamination
+#Average
+mean(genome_metadata$contamination)
+#Standard Deviation
+sd(genome_metadata$contamination)
+
+```
+```{r sequencing statistics, warning=FALSE, comments="", message=FALSE}
+
+seq_stats = genome_metadata
+read_summary=read_counts_filt
+read_summary = read_summary[match(seq_stats$genome, read_summary$genome), ]
+read_summary = column_to_rownames(read_summary, var = "genome")
+
+seq_stats$length.megabases. = seq_stats$length * 150/1000000
+seq_stats$Total.Reads = rowSums(read_summary)
+seq_stats$Total.Basepairs..MB. = seq_stats$Total.Reads * 150/1000000
+seq_stats$x.Coverage = seq_stats$Total.Basepairs..MB. / seq_stats$length.megabases.
+
+
+ggplot(seq_stats, aes(x=x.Coverage)) + geom_histogram(binwidth = 0.2, fill = "skyblue", color = "black") +
+  labs(x = "Coverage (binned)", y = "Frequency of MAGs") + 
+  scale_x_continuous(limits = c(0, 10)) + 
+  scale_y_continuous(limits = c(0, 75)) + 
+  geom_vline(xintercept = median(seq_stats$x.Coverage, na.rm = TRUE), linetype = "dashed", color = "red") + 
+  theme_minimal()
+
+ggplot(seq_stats, aes(x=Total.Basepairs..MB.)) + geom_histogram(binwidth = 100, fill = "skyblue", color = "black") +
+  labs(x = "Basepairs Sequenced (binned)", y = "Frequency of MAGs") + scale_x_continuous(limits = c(0, 3000)) + 
+  geom_vline(xintercept = median(seq_stats$Total.Basepairs..MB., na.rm = TRUE), linetype = "dashed", color = "red") + 
+  theme_minimal()
+
+ggplot(seq_stats, aes(x=completeness)) + geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(x = "Completeness of MAG (binned) (%)", y = "Frequency of MAGs") + scale_x_continuous(limits = c(0, 100)) + 
+  geom_vline(xintercept = median(seq_stats$completeness, na.rm = TRUE), linetype = "dashed", color = "red") + 
+  theme_minimal()
+
+ggplot(seq_stats, aes(x=contamination)) + geom_histogram(binwidth = 1, fill = "skyblue", color = "black") +
+  labs(x = "Contamination of MAG (binned) (%)", y = "Frequency of MAGs") + #scale_x_continuous(limits = c(0, 100)) + 
+  geom_vline(xintercept = median(seq_stats$contamination, na.rm = TRUE), linetype = "dashed", color = "red") + 
+  theme_minimal()
+
+
+
+```
 
 ## Recovered microbial fraction
 
-```{r data_estimations_plot, message=FALSE, warning=FALSE, fig.height=12, fig.width=10, fig.fullwidth=TRUE}
+```{r data_estimations_plot, message=FALSE, warning=FALSE, fig.height=6, fig.width=10, fig.fullwidth=TRUE}
 #Fraction of DNA that was recovered vs expected separated by species and sample type
 
 singlem_table <- sequence_fractions %>%
