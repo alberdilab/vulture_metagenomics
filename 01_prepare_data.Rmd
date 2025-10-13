@@ -17,6 +17,8 @@ individuals = read.csv("vulture_individuals.csv")
 sample_metadata$state = substr(word(sample_metadata$region),1,nchar(word(sample_metadata$region))-1)
 #Join sample number with metadata
 sample_metadata = left_join(sample_metadata, individuals, by = "sample")
+
+removed_samples = sample_metadata[which(sample_metadata$metagenomic_bases==0),]$sample
 ```
 
 ### Read counts
@@ -99,10 +101,10 @@ genome_counts_filt <- read_counts_filt %>%
   mutate(across(where(is.numeric), ~ . / (genome_metadata$length / readlength) ))
 genome_counts_filt = column_to_rownames(genome_counts_filt, "genome")
 genome_counts_filt = genome_counts_filt[,-c(which(colSums(genome_counts_filt)==0))]
-genome_counts_filt = rownames_to_column(genome_counts_filt, "genome")
+genome_counts_filt = rownames_to_column(genome_counts_filt,"genome")
 
 #Remove samples with 0 counts of MAGs
-sample_metadata = sample_metadata[match(colnames(genome_counts_filt)[-1], sample_metadata$sample),]
+sample_metadata = sample_metadata[match(colnames(genome_counts_filt[-1]), sample_metadata$sample),]
 ```
 
 

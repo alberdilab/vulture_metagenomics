@@ -15,16 +15,22 @@ phylum_heatmap <- read_tsv("https://raw.githubusercontent.com/earthhologenome/EH
     mutate(phylum = factor(phylum, levels = unique(phylum))) %>%
     column_to_rownames(var = "genome")
 
-
 # Generate  basal tree
 circular_tree <- force.ultrametric(genome_tree, method="extend") %>% # extend to ultrametric for the sake of visualisation
     ggtree(., layout="fan", open.angle=10, size=0.5)
 
+#Uncomment to include species names as tip labels as well as swapping geom_tiplab() and geom_tiplab2() comment below. Additionally this does not work with completeness or genome size rings
+#tree_data <- circular_tree$data %>%
+#  left_join(genome_metadata, by = c("label" = "genome"))  # label = genome ID
+#circular_tree$data <- tree_data  # update tree with species info
+
 # Add phylum ring
-circular_tree <- gheatmap(circular_tree, phylum_heatmap, offset=0.55, width=0.1, colnames=FALSE) +
+#Code for using the species tip labels instead of MAG IDs
+circular_tree <- gheatmap(circular_tree, phylum_heatmap, offset=1, width=0.1, colnames=FALSE) +
         scale_fill_manual(values=phylum_colors) +
+#        geom_tiplab(aes(label = genome), size = 1.5, hjust = -.1) + 
         geom_tiplab2(size=1, hjust=-0.1) +
-        theme(legend.position = "none", plot.margin = margin(0, 0, 0, 0), panel.margin = margin(0, 0, 0, 0))
+        theme(plot.margin = margin(0, 0, 0, 0), panel.margin = margin(0, 0, 0, 0))
 
 # Flush color scale to enable a new color scheme in the next ring
 circular_tree <- circular_tree + new_scale_fill()
@@ -54,10 +60,10 @@ circular_tree <-  circular_tree +
          stat="identity")
 
 # Add text
-circular_tree <-  circular_tree +
-        annotate('text', x=2.7, y=0, label='            Phylum', family='arial', size=3.5) +
-        annotate('text', x=3.1, y=0, label='                         Genome quality', family='arial', size=3.5) +
-        annotate('text', x=3.5, y=0, label='                     Genome size', family='arial', size=3.5)
+#circular_tree <-  circular_tree +
+#        annotate('text', x=2.7, y=0, label='            Phylum', family='arial', size=3.5) +
+#        annotate('text', x=3.1, y=0, label='                         Genome quality', family='arial', size=3.5) +
+#        annotate('text', x=3.5, y=0, label='                     Genome size', family='arial', size=3.5)
 
 #Plot circular tree
 circular_tree %>% open_tree(30) %>% rotate_tree(90)

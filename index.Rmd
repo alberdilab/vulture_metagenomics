@@ -71,6 +71,8 @@ library(gridExtra)
 library(ggtreeExtra)
 library(ggtree)
 library(ggh4x)
+library(pheatmap)
+library(stringr)
 
 # For statistics
 library(spaa)
@@ -81,4 +83,6 @@ library(hilldiv2)
 library(distillR)
 library(ANCOMBC)
 library(lme4)
+library(FSA)
+library(broom)
 ```
