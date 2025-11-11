@@ -9,3 +9,4 @@ rmd_files:
   - 03_mag_catalogue.Rmd
   - 04_microbiome_composition.Rmd
   - 05_functional_potential.Rmd
+  - 06_taxonomic_functional_comparison.Rmd

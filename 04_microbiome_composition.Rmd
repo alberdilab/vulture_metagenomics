@@ -60,18 +60,36 @@ genome_counts_filt %>%
 
 ### Dominant Phyla
 ```{r phylum_data_summary, warning=FALSE, comments="", message=FALSE}
-#Dominant phyla
+#Dominant bacteria
 bin_count = genome_counts_filt %>%
   mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS normalisation
   pivot_longer(-genome, names_to = "sample", values_to = "count") %>% #reduce to minimum number of columns
   left_join(., genome_metadata, by = join_by(genome == genome)) %>% #append genome metadata
   left_join(., sample_metadata, by = join_by(sample == sample)) %>% #append sample metadata
   filter(!is.na(count))
+
+#Phylum level
 phyla_count = tapply(bin_count$count, bin_count$phylum, sum)
 phyla_rel = phyla_count / sum(phyla_count)
-head(sort(phyla_rel, decreasing = TRUE), 3)
+head(sort(phyla_rel, decreasing = TRUE), 5)
+
+#Family level
+family_count = tapply(bin_count$count, bin_count$family, sum)
+family_rel = family_count / sum(family_count)
+head(sort(family_rel, decreasing = TRUE), 5)
+
+#Genus level
+genus_count = tapply(bin_count$count, bin_count$genus, sum)
+genus_rel = genus_count / sum(genus_count)
+head(sort(genus_rel, decreasing = TRUE), 6)
+
+#Species level
+species_count = tapply(bin_count$count, bin_count$species.x, sum)
+species_rel = species_count / sum(species_count)
+head(sort(species_rel, decreasing = TRUE), 6)
 
 sum(genome_metadata$genus=="g__")
+sum(genome_metadata$genus=="g__")/length(genome_metadata$genome)
 sum(genome_metadata$species=="s__")
 sum(genome_metadata$species=="s__")/length(genome_metadata$species)
 
@@ -87,7 +105,6 @@ heatmap_rel = sweep(heatmap_count, 2, colSums(heatmap_count), FUN = "/")
 heatmap_rel = t(scale(t(heatmap_rel)))
 attr(heatmap_rel, "scaled:center") <- NULL
 attr(heatmap_rel, "scaled:scale") <- NULL
-
 
 #pheatmap(as.matrix(heatmap_rel), annotation_col = lapply(sample_metadata, factor), annotation_colors = list(data.frame(species = c("Cathartes aura", "Coragyps atratus"), sample_type = c("Stomach contents", "Colon contents"), state = c("Texas", "Flroida"))), scale = "none")
 
@@ -159,12 +176,12 @@ family_arrange <- family_summary %>%
     group_by(family) %>%
     summarise(mean=sum(relabun)) %>%
     arrange(-mean) %>%
-    select(family) %>%
+    dplyr::select(family) %>%
     mutate(family= sub("^f__", "", family)) %>%
     pull()
 
 family_summary %>%
-    left_join(genome_metadata %>% select(family,phylum) %>% unique(),by=join_by(family==family)) %>%
+    left_join(genome_metadata %>% dplyr::select(family,phylum) %>% unique(),by=join_by(family==family)) %>%
     left_join(sample_metadata,by=join_by(sample==sample)) %>%
     mutate(family= sub("^f__", "", family)) %>%
     filter(family %in% family_arrange[1:20]) %>%
@@ -206,12 +223,12 @@ genus_arrange <- genus_summary %>%
     summarise(mean=sum(relabun)) %>%
     filter(genus != "g__")%>%
     arrange(-mean) %>%
-    select(genus) %>%
+    dplyr::select(genus) %>%
     mutate(genus= sub("^g__", "", genus)) %>%
     pull()
 
 genus_summary %>%
-    left_join(genome_metadata %>% select(genus,phylum) %>% unique(),by=join_by(genus==genus)) %>%
+    left_join(genome_metadata %>% dplyr::select(genus,phylum) %>% unique(),by=join_by(genus==genus)) %>%
     left_join(sample_metadata,by=join_by(sample==sample)) %>%
     mutate(genus= sub("^g__", "", genus)) %>%
     filter(genus %in% genus_arrange[1:20]) %>%
@@ -280,28 +297,75 @@ alpha_div <- richness %>%
   full_join(neutral, by = join_by(sample == sample)) %>%
   full_join(phylogenetic, by = join_by(sample == sample)) %>%
   full_join(functional, by = join_by(sample == sample))
+
+#Color Palette
+color_pal <- c("#000000","#004949","#009292","#ff6db6","#ffb6db",
+ "#490092","#006ddb","#b66dff","#6db6ff","#b6dbff",
+ "#920000","#924900","#db6d00","#24ff24","#ffff6d", "#999999")
 ```
 
 ### Plot Alpha Diversity
 
 ```{r alpha_div_plot, comment="", message=FALSE, warning=FALSE, fig.height=3, fig.width=10, fig.fullwidth=TRUE}
+metadata_test = sample_metadata
+#Change columns here for subetting
+metadata_test$group = with(metadata_test, paste(species, sample_type, sep = "_"))
+
+
+alpha_df <- alpha_div %>%
+  left_join(metadata_test, by = "sample") %>% 
+  mutate(richness_log = log(richness + 1)) %>% 
+  mutate(neutral_log = log(neutral + 1)) %>% 
+  mutate(phylogenetic_log = log(phylogenetic + 1)) %>% 
+  mutate(functional_log = log(functional + 1))
+
+alpha_comps = c("richness_log", "neutral_log", "phylogenetic_log", "functional_log")
+
+models <- list()
+
+for (comp in alpha_comps) {
+  
+model_log <- lm(as.formula(paste(comp, "~ group")), data = alpha_df)
+  
+models[[comp]] <- model_log
+
+summary(models[[comp]])
+
+#Significance
+anova(models[[comp]])
+
+#Normality of residuals
+shapiro.test(residuals(models[[comp]]))
+
+#Diagnostic plots
+#plot(models[[comp]])
+
+#Test for equal variances across groups
+car::leveneTest(as.formula(paste(comp, "~ group")), data = alpha_df)
+
+#Test pairwise differences
+pairwise <- emmeans(models[[comp]], pairwise ~ group, adjust = "fdr")
+pairwise_table = as.data.frame(pairwise$contrasts)
+pairwise_table <- pairwise_table %>%
+  separate(contrast, into = c("group1", "group2"), sep = " - ")
+pairwise_table$y.position <- max(alpha_df$functional_log) * 1.1 + 
+                             seq(0, 0.1, length.out = nrow(pairwise_table))
+
+
+}
+
+#Plot differences
 alpha_plot = alpha_div %>%
   pivot_longer(-sample, names_to = "metric", values_to = "value") %>%
-  left_join(., sample_metadata, by = join_by(sample == sample)) %>%
+  left_join(., metadata_test, by = join_by(sample == sample)) %>%
   mutate(metric=factor(metric,levels=c("richness","neutral","phylogenetic","functional"))) %>%
-  unite("group", c(species,sample_type), remove = FALSE) %>%
+  unite("group", group, remove = FALSE) %>%
       ggplot(aes(y = value, x = group, group=group, color=group, fill=group)) +
       geom_boxplot(outlier.shape = NA) +
   stat_summary(fun.y = mean, color = "black", geom = "point", shape = 21, fill = "white",)+
       geom_jitter(alpha=0.5) +
-      scale_color_manual(name="Group",
-          breaks=c("Cathartes aura_Colon contents","Coragyps atratus_Colon contents","Cathartes aura_Stomach contents","Coragyps atratus_Stomach contents"),
-          labels=c("Cathartes aura (colon)","Coragyps atratus (colon)","Cathartes aura (stomach)","Coragyps atratus (stomach)"),
-          values=c(species_colors, "#FF6A6A", "#8B8989" )) +
-      scale_fill_manual(name="Group",
-          breaks=c("Cathartes aura_Colon contents","Coragyps atratus_Colon contents","Cathartes aura_Stomach contents","Coragyps atratus_Stomach contents"),
-          labels=c("Cathartes aura (colon)","Coragyps atratus (colon)","Cathartes aura (stomach)","Coragyps atratus (stomach)"),
-          values=c(species_colors, "#FF6A6A", "#8B8989" )) +
+      scale_color_manual(name = "Group", values = color_pal) +
+      scale_fill_manual(name = "Group", values = color_pal) +
       facet_wrap(. ~ metric, scales = "free", ncol=4) +
       coord_cartesian(xlim = c(1, NA)) +
       theme_classic() +
@@ -314,69 +378,9 @@ alpha_plot = alpha_div %>%
 
 alpha_plot
 
-alpha_long <- alpha_div %>%
-  pivot_longer(-sample, names_to = "metric", values_to = "value") %>%
-  left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  mutate(
-    metric = factor(metric, levels = c("richness", "neutral", "phylogenetic", "functional")),
-    group = paste(species, sample_type, sep = "_"))
+   filename <- paste0("Figures/SubsettedData/AlphaDiv2subsets/", "AlphaDiv2subsets.png")
+    ggsave(filename, plot = alpha_plot, width = 15, height = 5, dpi = 300)
 
-```
-
-```{r alpha_div_test}
-
-alpha_div=neutral
-
-color_pal <- c("#000000","#004949","#009292","#ff6db6","#ffb6db",
- "#490092","#006ddb","#b66dff","#6db6ff","#b6dbff",
- "#920000","#924900","#db6d00","#24ff24","#ffff6d", "#999999")
-
-alpha_div_long <- alpha_div %>%
-  pivot_longer(-sample, names_to = "metric", values_to = "value") %>%
-  left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  unite("group", c(sample_type, species, state), remove = FALSE)
-
-# Count number of samples per group and metric
-group_counts <- alpha_div_long %>%
-  group_by(group, metric) %>%
-  summarise(n = n(), .groups = "drop")
-
-alpha_plot <- alpha_div_long %>%
-  ggplot(aes(y = value, x = group, group = group, color = group, fill = group)) +
-  geom_boxplot(outlier.shape = NA) +
-  stat_summary(fun = mean, color = "black", geom = "point", shape = 21, fill = "white") +
-  geom_jitter(alpha = 0.5) +
-  geom_text(data = group_counts, aes(x = group, y = min(alpha_div_long$value) - 0.05, label = n), 
-            inherit.aes = FALSE, size = 3, angle = 0, vjust = 1.5) +
-  scale_color_manual(name = "Group", values = color_pal) +
-  scale_fill_manual(name = "Group", values = color_pal) +
-  facet_wrap(. ~ metric, scales = "free", ncol = 4) +
-  coord_cartesian(xlim = c(1, NA)) +
-  theme_classic() +
-  theme(
-    strip.background = element_blank(),
-    panel.grid.minor.x = element_line(size = .1, color = "grey"),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank(),
-    axis.text.x = element_blank()
-  )
-
-alpha_plot
-
-alpha_filtered <- alpha_div_long %>%
-     group_by(group) %>%
-     filter(n() >= 3)
-
-alpha_filtered %>%
-     group_by(group) %>%
-     summarise(shapiro_p = shapiro.test(value)$p.value)
-
-comp = combn(unique(alpha_filtered$group), 2, simplify = FALSE)
-
-kruskal_res <- kruskal.test(value ~ group, data = alpha_filtered)
-kruskal_res
-
-dunn_res = dunnTest(value ~ group, data = alpha_filtered, method = "bh")
 
 ```
 
@@ -392,49 +396,7 @@ beta_q0n <- genome_counts_filt %>%
   select_if(~!all(. == 0)) %>%
   hillpair(., q = 0)
 
-#Neutral Divesity with Colon Contents Fixed
-metadata_colon = sample_metadata[which(sample_metadata$sample_type == "Colon contents"),]
-genome_counts_colon = column_to_rownames(genome_counts_filt, "genome")
-genome_counts_colon = genome_counts_colon[,which(colnames(genome_counts_colon) %in% metadata_colon$sample)]
-genome_counts_colon = rownames_to_column(genome_counts_colon, "genome")
-
-beta_q1n_colon <- genome_counts_colon %>%
-  column_to_rownames(., "genome") %>%
-  filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
-  select_if(~!all(. == 0)) %>%
-  hillpair(., q = 1)
-
-#Neutral Divesity with Stomach Contents Fixed
-metadata_stomach = sample_metadata[which(sample_metadata$sample_type == "Stomach contents"),]
-genome_counts_stomach = column_to_rownames(genome_counts_filt, "genome")
-genome_counts_stomach = genome_counts_stomach[,which(colnames(genome_counts_stomach) %in% metadata_stomach$sample)]
-genome_counts_stomach = rownames_to_column(genome_counts_stomach, "genome")
-
-beta_q1n_stomach <- genome_counts_stomach %>%
-  column_to_rownames(., "genome") %>%
-  filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
-  select_if(~!all(. == 0)) %>%
-  hillpair(., q = 1)
-
-#Neutral Divesity with C. aura Fixed
-metadata_caura = sample_metadata[which(sample_metadata$species == "Cathartes aura"),]
-genome_counts_caura = column_to_rownames(genome_counts_filt, "genome")
-genome_counts_caura = genome_counts_caura[,which(colnames(genome_counts_caura) %in% metadata_caura$sample)]
-genome_counts_caura = rownames_to_column(genome_counts_caura, "genome")
-
-beta_q1n_caura <- genome_counts_caura %>%
-  column_to_rownames(., "genome") %>%
-  filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
-  select_if(~!all(. == 0)) %>%
-  hillpair(., q = 1)
-
-#Neutral Divesity with C. atratus Fixed
-metadata_catratus = sample_metadata[which(sample_metadata$species == "Coragyps atratus"),]
-genome_counts_catratus = column_to_rownames(genome_counts_filt, "genome")
-genome_counts_catratus = genome_counts_catratus[,which(colnames(genome_counts_catratus) %in% metadata_catratus$sample)]
-genome_counts_catratus = rownames_to_column(genome_counts_catratus, "genome")
-
-beta_q1n_catratus <- genome_counts_catratus %>%
+beta_q1n <- genome_counts_filt %>%
   column_to_rownames(., "genome") %>%
   filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
   select_if(~!all(. == 0)) %>%
@@ -452,317 +414,145 @@ beta_q1f <- genome_counts_filt %>%
   hillpair(., q = 1, dist = dist)
 ```
 
-### Richness diversity plot (Species)
-```{r rich_div_species, warning=FALSE, comments="", message=FALSE}
-group_richness = sample_metadata[na.omit(match(sample_metadata$sample, names(beta_q0n$S))),]
+### Richness (No Sex, Metadata fixed)
+``` {r richness_no_sex, warning=FALSE, comments="", message=FALSE}
+# Example metadata and counts
+metadata_test <- sample_metadata 
 
-beta_q0n$S %>%
-  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
-  vegan::scores() %>%
-  as_tibble(., rownames = "sample") %>%
-  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(species) %>%
-  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
-  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
-  ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = species)) +
-  geom_point(size = 4) +
-  scale_color_manual(values = species_colors) +
-  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
-  theme(
-    axis.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 10),
-    panel.background = element_blank(),
-    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
-    legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    ) +
-    labs(color="Species")
+genome_counts_test <- genome_counts_filt %>%
+  column_to_rownames(var = "genome")
 
-#Richness
-betadisper(beta_q0n$S, group_richness$species) %>% permutest(., pairwise = TRUE) 
+# Fix sample matching
+genome_counts_test <- genome_counts_test[, colnames(genome_counts_test) %in% metadata_test$sample]
 
-adonis2(beta_q0n$S ~ species, 
-        data = group_richness %>% arrange(match(sample,labels(beta_q0n$S))), 
-        permutations = 999) %>%
-        broom::tidy() %>%
-        tt()
-```
-### Richness diversity plot (Sample Type)
-```{r rich_div_sample, warning=FALSE, comments="", message=FALSE}
-group_richness = sample_metadata[na.omit(match(sample_metadata$sample, names(beta_q0n$S))),]
+# Metadata columns to test (must each have exactly 2 unique values)
+grouping_vars <- c("species", "sample_type")  # adjust as needed
 
-beta_q0n$S %>%
-  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
-  vegan::scores() %>%
-  as_tibble(., rownames = "sample") %>%
-  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(sample_type #, species
-           ) %>%
-  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
-  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
-  ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = sample_type,  #shape = as.factor(species)
-             )) +
-  geom_point(size = 4) +
-  scale_color_manual(values = sampletype_colors) +
-  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
-  theme(
-    axis.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 10),
-    panel.background = element_blank(),
-    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
-    legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    ) + 
-    #labs(shape="Species") +
-    labs(color="Sample Type")
-#+geom_text_repel(aes(label = sample), size=3)
+# Different palettes for each variable
+palette_list <- list(
+  species = species_colors,
+  sample_type   = sampletype_colors,
+  state   = state_colors
+)
 
-#Richness
-betadisper(beta_q0n$S, group_richness$sample_type) %>% permutest(., pairwise = TRUE) 
+# Results containers
+betadisper_results <- list()
+results_adonis <- list()
 
+for (var in grouping_vars) {
+  
+  # "Other variables" are those NOT being compared
+  other_vars <- setdiff(grouping_vars, var)
+  
+  # Loop through every unique combination of the other variables
+  combos <- metadata_test %>% distinct(across(all_of(other_vars)))
+  
+  for (i in 1:nrow(combos)) {
+    # Subset metadata to this fixed combination
+    subset_meta <- metadata_test %>%
+      filter(across(all_of(other_vars), ~ .x == combos[[cur_column()]][i]))
+    
+    # Skip if not enough samples for comparison
+    if (length(unique(subset_meta[[var]])) < 2) next
+    
+    # Subset counts
+    subset_counts <- genome_counts_test[, colnames(genome_counts_test) %in% subset_meta$sample]
+    
+    # Recompute hillpair
+    beta_sub <- subset_counts %>%
+  filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
+  select_if(~!all(. == 0)) %>%
+  hillpair(., q = 0)
+    
+    # NMDS
+    nmds <- metaMDS(beta_sub$S, trymax = 500, k = 2, trace = 0)
+    scores_df <- scores(nmds) %>%
+      as_tibble(rownames = "sample") %>%
+      left_join(subset_meta, by = "sample") %>%
+      group_by(.data[[var]]) %>%
+      mutate(
+        x_cen = mean(NMDS1, na.rm = TRUE),
+        y_cen = mean(NMDS2, na.rm = TRUE)
+      ) %>%
+      ungroup()
+  
+    # Ensure rownames match and add 'group'
+subset_meta2 <- subset_meta %>%
+  column_to_rownames("sample") %>%
+  .[labels(beta_sub$S), , drop = FALSE] %>%
+  mutate(group = .data[[var]])
 
-adonis2(beta_q0n$S ~ sample_type, 
-        data = group_richness %>% arrange(match(sample,labels(beta_q0n$S))), 
-        permutations = 999) %>%
-        broom::tidy() %>%
-        tt()
-```
-### Richness diversity plot (Sex)
-```{r rich_div_sex, warning=FALSE, comments="", message=FALSE}
-group_richness = sample_metadata[na.omit(match(sample_metadata$sample, names(beta_q0n$S))),]
+# betadisper
+bd <- betadisper(beta_sub$S, subset_meta2$group)
+bd_res <- permutest(bd, pairwise = TRUE)
 
-beta_q0n$S %>%
-  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
-  vegan::scores() %>%
-  as_tibble(., rownames = "sample") %>%
-  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(sex) %>%
-  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
-  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
-  ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = sex #, fill = sex, shape = as.factor(state)
-             )) +
-  geom_point(size = 4) +
-  scale_color_manual(values = sex_colors) +
-  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
-  theme(
-    axis.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 10),
-    panel.background = element_blank(),
-    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
-    legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    ) +
-    labs(color="Sex")
+# Save betadisper results in a tidy tibble
+betadisper_results[[paste(var, i, sep = "_")]] <- list(
+  var = var,
+  fixed = paste0(combos[i, ], collapse = ", "),
+  result = bd_res
+)
 
-#Calculate dispersion and significance
-betadisper(beta_q0n$S, group_richness$sex) %>% permutest(., pairwise = TRUE) 
+# adonis2
+ad <- adonis2(
+  beta_sub$S ~ group,
+  data = subset_meta2,
+  permutations = 999,
+  method = "bray"
+) %>%
+  broom::tidy() %>%
+  mutate(
+    variable = var,
+    fixed = paste0(combos[i, ], collapse = ", ")
+  )
 
-adonis2(beta_q0n$S ~ sex, 
-        data = group_richness %>% arrange(match(sample,labels(beta_q0n$S))), 
-        permutations = 999) %>%
-        broom::tidy() %>%
-        tt()
-```
-### Richness diversity plot (State)
-```{r rich_div_state, warning=FALSE, comments="", message=FALSE}
-group_richness = sample_metadata[na.omit(match(sample_metadata$sample, names(beta_q0n$S))),]
+results_adonis[[paste(var, i, sep = "_")]] <- ad
+  
+    combo_label <- paste0(combos[i, ], collapse = " and ")
+    plot_title  <- paste("Richness of", var, "controlling", combo_label) %>% 
+      str_wrap(width = 45) 
 
-beta_q0n$S %>%
-  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
-  vegan::scores() %>%
-  as_tibble(., rownames = "sample") %>%
-  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(state) %>%
-  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
-  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
-  ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = state # shape = as.factor(sex)
-             )) +
-  geom_point(size = 4) +
-  scale_color_manual(values = state_colors) +
-  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
-  theme(
-    axis.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 10),
-    panel.background = element_blank(),
-    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
-    legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    ) +
-    labs(color="State")
+    p <- ggplot(scores_df, aes(x = NMDS1, y = NMDS2, color = .data[[var]])) +
+      geom_point(size = 4) +
+      stat_ellipse(type = "norm", linetype = 2) + 
+      annotate("text", x = Inf, y = -Inf, label = paste0("p = ", signif(ad$p.value[1], 3)), hjust = 1.1, vjust = -0.5, size = 4) + 
+      scale_color_manual(values = palette_list[[var]]) +
+      geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+      theme(
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 10),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5, colour = "black"),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.position = "right"
+      ) +
+      labs(
+        title = plot_title
+      )
+    
+    # Save
+    fixed_text <- paste(combos, collapse = "_")
+   filename <- paste0("Figures/SubsettedData/BetaDiv2subsets/", "Richness_", var, "_", 
+                   paste0(combos[i, ], collapse = "_"), ".png")
+   filename <- gsub(" ", "_", filename)
+    ggsave(filename, plot = p, width = 6, height = 5, dpi = 300)
+    
 
-#Calculate dispersion and significance
-betadisper(beta_q0n$S, group_richness$state) %>% permutest(., pairwise = TRUE) 
+  }
+}
 
+taxonomic_adonis <- bind_rows(results_adonis)
 
-adonis2(beta_q0n$S ~ state, 
-        data = group_richness %>% arrange(match(sample,labels(beta_q0n$S))), 
-        permutations = 999) %>%
-        broom::tidy() %>%
-        tt()
-```
+# Inspect results
+betadisper_results
+taxonomic_adonis
 
-### Neutral Diversity (Species)
-``` {r neutral_div_species, warning=FALSE, comments="", message=FALSE, eval=FALSE}
-group_neutral = sample_metadata[na.omit(match(sample_metadata$species, names(beta_q1n$S))),]
-
-beta_q1n$S %>%
-  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
-  vegan::scores() %>%
-  as_tibble(., rownames = "sample") %>%
-  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(sample_type) %>%
-  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
-  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
-  ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = species#, fill = sample_type, shape = as.factor(sample_type)
-             )) +
-  geom_point(size = 4) +
-  scale_color_manual(values = species_colors)+
-  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
-  theme(
-    axis.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 10),
-    panel.background = element_blank(),
-    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
-    legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    ) 
-
-betadisper(beta_q1n$S, group_neutral$species) %>% permutest(., pairwise = TRUE) 
-
-adonis2(beta_q1n$S ~ species, 
-        data = group_neutral %>% arrange(match(sample,labels(beta_q1n$S))), 
-        permutations = 999) %>%
-        broom::tidy() %>%
-        tt()
-
-```
-### Neutral Diversity (Sample Type)
-``` {r neutral_div_sample, warning=FALSE, comments="", message=FALSE, eval=FALSE}
-group_neutral = sample_metadata[na.omit(match(sample_metadata$sample, names(beta_q1n$S))),]
-
-beta_q1n$S %>%
-  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
-  vegan::scores() %>%
-  as_tibble(., rownames = "sample") %>%
-  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(sample_type) %>%
-  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
-  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
-  ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = sample_type#, fill = sample_type, shape = as.factor(sample_type)
-             )) +
-  geom_point(size = 4) +
-  scale_color_manual(values = sampletype_colors)+
-  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
-  theme(
-    axis.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 10),
-    panel.background = element_blank(),
-    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
-    legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    ) 
-
-betadisper(beta_q1n$S, group_neutral$sample_type) %>% permutest(., pairwise = TRUE) 
-
-adonis2(beta_q1n$S ~ sample_type, 
-        data = group_neutral %>% arrange(match(sample,labels(beta_q1n$S))), 
-        permutations = 999) %>%
-        broom::tidy() %>%
-        tt()
 
 ```
 
-### Neutral Diversity (Sex)
-``` {r neutral_div_sex, warning=FALSE, comments="", message=FALSE, eval=FALSE}
-group_neutral = sample_metadata[na.omit(match(sample_metadata$sample, names(beta_q1n$S))),]
-
-beta_q1n$S %>%
-  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
-  vegan::scores() %>%
-  as_tibble(., rownames = "sample") %>%
-  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(sex) %>%
-  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
-  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
-  ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = sex#, shape = as.factor(state)
-             )) +
-  geom_point(size = 4) +
-  scale_color_manual(values = sex_colors)+
-  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
-  theme(
-    axis.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 10),
-    panel.background = element_blank(),
-    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
-    legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    ) +
-    labs(color="Sex")
-
-betadisper(beta_q1n$C, group_neutral$sex) %>% permutest(., pairwise = TRUE) 
-
-adonis2(beta_q1n$S ~ sex, 
-        data = group_neutral %>% arrange(match(sample,labels(beta_q1n$S))), 
-        permutations = 999) %>%
-        broom::tidy() %>%
-        tt()
-```
-### Neutral Diversity (State)
-``` {r neutral_div_state, warning=FALSE, comments="", message=FALSE, eval=FALSE}
-group_neutral = sample_metadata[na.omit(match(sample_metadata$sample, names(beta_q1n$S))),]
-
-beta_q1n$S %>%
-  vegan::metaMDS(., trymax = 500, k = 2, trace=0) %>%
-  vegan::scores() %>%
-  as_tibble(., rownames = "sample") %>%
-  dplyr::left_join(sample_metadata, by = join_by(sample == sample)) %>%
-  group_by(state) %>%
-  mutate(x_cen = mean(NMDS1, na.rm = TRUE)) %>%
-  mutate(y_cen = mean(NMDS2, na.rm = TRUE)) %>%
-  ungroup() %>%
-  ggplot(aes(x = NMDS1, y = NMDS2, color = state#, shape = as.factor(state)
-             )) +
-  geom_point(size = 4) +
-  scale_color_manual(values = state_colors)+
-  geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
-  theme(
-    axis.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 10),
-    panel.background = element_blank(),
-    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
-    legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    ) +
-    labs(color="State")
-
-betadisper(beta_q1n$C, group_neutral$state) %>% permutest(., pairwise = TRUE) 
-
-adonis2(beta_q1n$S ~ state, 
-        data = group_neutral %>% arrange(match(sample,labels(beta_q1n$S))), 
-        permutations = 999) %>%
-        broom::tidy() %>%
-        tt()
-```
-
-
-
-### Neutral Diversity (All metadata compared)
-``` {r neutral_beta_comparison_all, warning=FALSE, comments="", message=FALSE, fig.height = 10, fig.width = 14}
+### Neutral Diversity PCoA (No sex metadata compared)
+``` {r neutral_pcoa_beta_comparison_nosex, warning=FALSE, comments="", message=FALSE, fig.height = 10, fig.width = 14}
 metadata_test= column_to_rownames(sample_metadata, var="sample")
 genome_counts_test = column_to_rownames(genome_counts_filt, var="genome")
 genome_counts_test <- genome_counts_test[, rownames(metadata_test)]
@@ -813,6 +603,51 @@ beta_div
 
 ```
 
+### Neutral Diversity NMDS (No sex metadata compared)
+``` {r neutral_nmds_beta_comparison_nosex, warning=FALSE, comments="", message=FALSE, fig.height = 10, fig.width = 14}
+metadata_test = sample_metadata
+rownames(metadata_test) = metadata_test$sample
+genome_counts_test = column_to_rownames(genome_counts_filt, var="genome")
+genome_counts_test <- genome_counts_test[, rownames(metadata_test)]
+
+# Create a grouping column that combines metadata values
+metadata_test$group <- with(metadata_test, paste(species, sample_type, state, sep = "_"))
+
+beta_q1n <- genome_counts_test %>%
+  filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
+  select_if(~!all(. == 0)) %>%
+  hillpair(., q = 1)
+
+beta_dist <- as.dist(beta_q1n$S)
+
+adonis2(beta_dist ~ group, data = metadata_test, permutations = 999)
+
+nmds <- metaMDS(beta_q1n$S, trymax = 500, k = 2, trace = 0)
+scores_df <- scores(nmds) %>%
+      as_tibble(rownames = "sample") %>%
+      left_join(metadata_test, by = "sample") %>%
+      group_by(metadata_test$group) %>%
+      mutate(
+        x_cen = mean(NMDS1, na.rm = TRUE),
+        y_cen = mean(NMDS2, na.rm = TRUE)
+      ) %>%
+      ungroup()
+
+ggplot(scores_df, aes(NMDS1, NMDS2, color = group, shape = sample_type)) +
+  geom_point(size = 3, alpha = 0.7) +
+  stat_ellipse() +
+  theme_bw() +
+  labs(
+    title = "Beta Diversity"
+  ) +
+  theme_minimal() + 
+  theme(panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA)) +
+  scale_color_manual(values = color_pal)
+  
+
+```
+
 ### Neutral Diversity (No Sex, Metadata fixed)
 ``` {r neutral_div_no_sex, warning=FALSE, comments="", message=FALSE}
 # Example metadata and counts
@@ -824,14 +659,8 @@ genome_counts_test <- genome_counts_filt %>%
 # Fix sample matching
 genome_counts_test <- genome_counts_test[, colnames(genome_counts_test) %in% metadata_test$sample]
 
-# Beta diversity matrix
-beta_q1n <- genome_counts_test %>%
-  filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
-  select_if(~!all(. == 0)) %>%
-  hillpair(., q = 1)
-
 # Metadata columns to test (must each have exactly 2 unique values)
-grouping_vars <- c("species", "sample_type", "state")  # adjust as needed
+grouping_vars <- c("species", "sample_type")  # adjust as needed
 
 # Different palettes for each variable
 palette_list <- list(
@@ -842,7 +671,7 @@ palette_list <- list(
 
 # Results containers
 betadisper_results <- list()
-adonis_results <- list()
+results_adonis <- list()
 
 for (var in grouping_vars) {
   
@@ -880,13 +709,47 @@ for (var in grouping_vars) {
         y_cen = mean(NMDS2, na.rm = TRUE)
       ) %>%
       ungroup()
-    
-    combo_label <- paste0(other_vars, " = ", combos[i, ], collapse = ", ")
-    plot_title  <- paste("NMDS of", var, "with", combo_label) %>% 
+  
+    # Ensure rownames match and add 'group'
+subset_meta2 <- subset_meta %>%
+  column_to_rownames("sample") %>%
+  .[labels(beta_sub$S), , drop = FALSE] %>%
+  mutate(group = .data[[var]])
+
+# betadisper
+bd <- betadisper(beta_sub$S, subset_meta2$group)
+bd_res <- permutest(bd, pairwise = TRUE)
+
+# Save betadisper results in a tidy tibble
+betadisper_results[[paste(var, i, sep = "_")]] <- list(
+  var = var,
+  fixed = paste0(combos[i, ], collapse = ", "),
+  result = bd_res
+)
+
+# adonis2
+ad <- adonis2(
+  beta_sub$S ~ group,
+  data = subset_meta2,
+  permutations = 999,
+  method = "bray"
+) %>%
+  broom::tidy() %>%
+  mutate(
+    variable = var,
+    fixed = paste0(combos[i, ], collapse = ", ")
+  )
+
+results_adonis[[paste(var, i, sep = "_")]] <- ad
+  
+    combo_label <- paste0(combos[i, ], collapse = " and ")
+    plot_title  <- paste("Neutral Beta Diversity of", var, "controlling", combo_label) %>% 
       str_wrap(width = 45) 
-    # Plot
+
     p <- ggplot(scores_df, aes(x = NMDS1, y = NMDS2, color = .data[[var]])) +
       geom_point(size = 4) +
+      stat_ellipse(type = "norm", linetype = 2) + 
+      annotate("text", x = Inf, y = -Inf, label = paste0("p = ", signif(ad$p.value[1], 3)), hjust = 1.1, vjust = -0.5, size = 4) + 
       scale_color_manual(values = palette_list[[var]]) +
       geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
       theme(
@@ -903,11 +766,86 @@ for (var in grouping_vars) {
       )
     
     # Save
-   filename <- paste0("Figures/SubsettedData/NMDS_", var, "_Fix_", 
+    fixed_text <- paste(combos, collapse = "_")
+   filename <- paste0("Figures/SubsettedData/BetaDiv2subsets/", "Neutral_", var, "_", 
                    paste0(combos[i, ], collapse = "_"), ".png")
+   filename <- gsub(" ", "_", filename)
     ggsave(filename, plot = p, width = 6, height = 5, dpi = 300)
     
-# Ensure rownames match and add 'group'
+
+  }
+}
+
+taxonomic_adonis <- bind_rows(results_adonis)
+
+# Inspect results
+betadisper_results
+taxonomic_adonis
+
+
+```
+
+### Phylogenetic Beta Diversity (No Sex, Metadata fixed)
+``` {r phylogenetic_beta_no_sex, warning=FALSE, comments="", message=FALSE}
+# Example metadata and counts
+metadata_test <- sample_metadata 
+
+genome_counts_test <- genome_counts_filt %>%
+  column_to_rownames(var = "genome")
+
+# Fix sample matching
+genome_counts_test <- genome_counts_test[, colnames(genome_counts_test) %in% metadata_test$sample]
+
+# Metadata columns to test (must each have exactly 2 unique values)
+grouping_vars <- c("species", "sample_type")  # adjust as needed
+
+# Different palettes for each variable
+palette_list <- list(
+  species = species_colors,
+  sample_type   = sampletype_colors,
+  state   = state_colors
+)
+
+# Results containers
+betadisper_results <- list()
+results_adonis <- list()
+
+for (var in grouping_vars) {
+  
+  # "Other variables" are those NOT being compared
+  other_vars <- setdiff(grouping_vars, var)
+  
+  # Loop through every unique combination of the other variables
+  combos <- metadata_test %>% distinct(across(all_of(other_vars)))
+  
+  for (i in 1:nrow(combos)) {
+    # Subset metadata to this fixed combination
+    subset_meta <- metadata_test %>%
+      filter(across(all_of(other_vars), ~ .x == combos[[cur_column()]][i]))
+    
+    # Skip if not enough samples for comparison
+    if (length(unique(subset_meta[[var]])) < 2) next
+    
+    # Subset counts
+    subset_counts <- genome_counts_test[, colnames(genome_counts_test) %in% subset_meta$sample]
+    
+    # Recompute hillpair
+    beta_sub <- subset_counts %>%
+  hillpair(., q = 1, tree = genome_tree)
+    
+    # NMDS
+    nmds <- metaMDS(beta_sub$S, trymax = 500, k = 2, trace = 0)
+    scores_df <- scores(nmds) %>%
+      as_tibble(rownames = "sample") %>%
+      left_join(subset_meta, by = "sample") %>%
+      group_by(.data[[var]]) %>%
+      mutate(
+        x_cen = mean(NMDS1, na.rm = TRUE),
+        y_cen = mean(NMDS2, na.rm = TRUE)
+      ) %>%
+      ungroup()
+  
+    # Ensure rownames match and add 'group'
 subset_meta2 <- subset_meta %>%
   column_to_rownames("sample") %>%
   .[labels(beta_sub$S), , drop = FALSE] %>%
@@ -920,7 +858,7 @@ bd_res <- permutest(bd, pairwise = TRUE)
 # Save betadisper results in a tidy tibble
 betadisper_results[[paste(var, i, sep = "_")]] <- list(
   var = var,
-  fixed = paste0(other_vars, "=", combos[i, ], collapse = ", "),
+  fixed = paste0(combos[i, ], collapse = ", "),
   result = bd_res
 )
 
@@ -933,23 +871,69 @@ ad <- adonis2(
 ) %>%
   broom::tidy() %>%
   mutate(
-    test_var = var,
-    fixed = paste0(other_vars, "=", combos[i, ], collapse = ", ")
+    variable = var,
+    fixed = paste0(combos[i, ], collapse = ", ")
   )
 
-adonis_results[[paste(var, i, sep = "_")]] <- ad
+results_adonis[[paste(var, i, sep = "_")]] <- ad
+  
+    combo_label <- paste0(combos[i, ], collapse = " and ")
+    plot_title  <- paste("Phylogenetic Beta Diversity of", var, "controlling", combo_label) %>% 
+      str_wrap(width = 45) 
+
+    p <- ggplot(scores_df, aes(x = NMDS1, y = NMDS2, color = .data[[var]])) +
+      geom_point(size = 4) +
+      stat_ellipse(type = "norm", linetype = 2) + 
+      annotate("text", x = Inf, y = -Inf, label = paste0("p = ", signif(ad$p.value[1], 3)), hjust = 1.1, vjust = -0.5, size = 4) + 
+      scale_color_manual(values = palette_list[[var]]) +
+      geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
+      theme(
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 10),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5, colour = "black"),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.position = "right"
+      ) +
+      labs(
+        title = plot_title
+      )
+    
+    # Save
+    fixed_text <- paste(combos, collapse = "_")
+   filename <- paste0("Figures/SubsettedData/BetaDiv2subsets/", "Phylogenetic_", var, "_", 
+                   paste0(combos[i, ], collapse = "_"), ".png")
+   filename <- gsub(" ", "_", filename)
+    ggsave(filename, plot = p, width = 6, height = 5, dpi = 300)
+    
+
   }
 }
 
+taxonomic_adonis <- bind_rows(results_adonis)
+
 # Inspect results
 betadisper_results
-adonis_results
+taxonomic_adonis
 
 
 ```
 
-### Differential Abundance of Bacteria by Sample Type
-```{r ancom_sampletype, warning=FALSE}
+
+
+``` {r relative_abundance_automated, eval=FALSE, warning = FALSE}
+
+test_vars <- c("species", "sample_type", "state")
+# Store results
+ancom_results <- list()
+
+palette_list <- list(
+  species = species_colors,
+  sample_type = sampletype_colors,
+  state = state_colors
+)
+
 phylo_metadata = data.frame(sample_metadata)
 phylo_metadata = column_to_rownames(phylo_metadata, var="sample")
 phylo_metadata = sample_data(phylo_metadata)
@@ -961,8 +945,9 @@ otu_mat <- as(otu_table(phylo_mag), "matrix")
 # Extract sample metadata as a dataframe
 meta_df <- as.data.frame(sample_data(phylo_metadata))
 
-# Make sure sample order matches
-sample_type_vec <- meta_df[colnames(otu_mat), "sample_type"]
+for (var in test_vars) {
+  
+sample_type_vec <- meta_df[colnames(otu_mat), paste(var)]
 
 within_group_var <- lapply(rownames(otu_mat), function(taxon) {
   vals <- otu_mat[taxon, ]
@@ -976,120 +961,42 @@ var_matrix <- do.call(rbind, within_group_var)
 # Identify taxa with ALL zero or NA variance across groups
 zero_var_taxa <- rownames(var_matrix)[apply(var_matrix, 1, function(x) all(is.na(x) | x == 0))]
 
-# Remove those taxa
-otu_mat_filtered <- otu_mat[!rownames(otu_mat) %in% zero_var_taxa, ]
-phylo_mag_filtered <- prune_taxa(setdiff(taxa_names(phylo_mag), zero_var_taxa), phylo_mag)
 
-phylo_mag_filtered <- otu_table(otu_mat_filtered, taxa_are_rows=TRUE)
+phylo_mag_filtered <- otu_table(otu_mat, taxa_are_rows=TRUE)
 mag_table <- phyloseq(phylo_mag_filtered, phylo_metadata)
 
 res <- ancombc2(
   data = mag_table,
-  fix_formula = "sample_type",
+  fix_formula = paste(var),
   p_adj_method = "holm",
   lib_cut = 20,
-  group = "sample_type",
+  group = paste(var),
   struc_zero = TRUE,
   neg_lb = TRUE,
   alpha = 0.05,
   global = FALSE,
   verbose = TRUE
 )
-
-# View results
-lfc_res <- as.data.frame(res$res$taxon)
-colnames(lfc_res)[1] = "Function"
-rownames(lfc_res) = lfc_res$Function
-lfc_res$Function = NULL
-
-lfc_res = mutate(lfc_res, lfc = res$res$'lfc_sample_typeStomach contents')
-lfc_res = mutate(lfc_res, p_val = res$res$'p_sample_typeStomach contents')
-
-# See significant taxa
-sig_taxa_sample = filter(lfc_res, p_val < 0.05)
-print(sig_taxa_sample)
-sig_taxa_sample$genome = rownames(sig_taxa_sample)
-
-sig_taxa_sample = merge(sig_taxa_sample, genome_metadata, by = "genome")
-sig_taxa_sample$signif_label <- cut(sig_taxa_sample$p_val, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", ""))
-
-# Bar plot of significant taxa (ordered by log fold change)
-ggplot(sig_taxa_sample, aes(x = reorder(genome, lfc), y = lfc, fill = lfc > 0)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  geom_text(aes(label = signif_label), hjust = ifelse(sig_taxa_sample$lfc > 0, -0.2, 1.2), color = "black", size = 4) +
-  coord_flip() +
-  scale_fill_manual(values = sampletype_colors, labels = c("Colon Contents", "Stomach Contents")) +
-  theme_minimal() +
-  labs(
-    x = "MAG",
-    y = "Log Fold Change",
-    title = "Enrichment of Significant Taxa",
-    fill = "More abundant in"
-  ) +
-  theme(axis.text.x = element_text(hjust = 1))
-
-```
-``` {r test, eval=FALSE}
-
-test_vars <- c("species", "sample_type", "state")
-# Store results
-ancom_results <- list()
-
-for (var in test_vars) {
-  message("Running ANCOM-BC2 for: ", var)
-
-  # Convert phyloseq into matrix + metadata
-  otu_mat <- as(otu_table(mag_table), "matrix")
-  meta_df <- as.data.frame(sample_data(mag_table))
-  
-  # Make sure sample order matches
-  group_vec <- meta_df[colnames(otu_mat), var]
-  
-  # Compute within-group variance for each taxon
-  within_group_var <- lapply(rownames(otu_mat), function(taxon) {
-    vals <- otu_mat[taxon, ]
-    tapply(vals, group_vec, na.rm = TRUE)   # variance by group
-  })
-  names(within_group_var) <- rownames(otu_mat)
-  
-  # Convert to matrix (taxa × groups)
-  var_matrix <- do.call(rbind, within_group_var)
-  
-  # Identify taxa with ALL zero/NA variance across groups
-  zero_var_taxa <- rownames(var_matrix)[apply(var_matrix, 1, function(x) all(is.na(x) | x == 0))]
-  
-  # Remove zero-variance taxa
-  otu_mat_filtered <- otu_mat[!rownames(otu_mat) %in% zero_var_taxa, ]
-  mag_table_filtered <- prune_taxa(setdiff(taxa_names(mag_table), zero_var_taxa), mag_table)
   
   
-  res <- ancombc2(
-    data = mag_table_filtered,
-    fix_formula = paste(var),
-    p_adj_method = "holm",
-    lib_cut = 0,
-    group = var,
-    struc_zero = TRUE,
-    neg_lb = TRUE,
-    alpha = 0.05,
-    global = FALSE,
-    verbose = TRUE
-  )
-  
-  # Extract results for all taxa
-  res_df <- res$res %>%
-    map(as.data.frame) %>%
-    bind_cols(.id = "metric") %>%
-    as_tibble()
+  taxa_names <- res$res$taxon
   
   # Build tidy table
-  lfc_col <- grep("^lfc_", names(res$res), value = TRUE)
-  p_col   <- grep("^p_", names(res$res), value = TRUE)
+  lfc_comp <- grep(paste0("^lfc_", var), names(res$res), value = TRUE)
+  p_comp   <- grep(paste0("^p_", var), names(res$res), value = TRUE)
+  
+  if (length(lfc_comp) == 0 || length(p_comp) == 0) {
+  warning("No LFC/P columns found for variable: ", var)
+  next
+  }
+  
+  lfc_df <- res$res[[lfc_comp[1]]]
+  p_df   <- res$res[[p_comp[1]]]
   
   tidy_res <- tibble(
-    genome   = rownames(res$res$taxon),
-    lfc      = res$res[[lfc_col]],
-    p_val    = res$res[[p_col]],
+    genome   = taxa_names,
+    lfc      = as.numeric(lfc_df),
+    p_val    = as.numeric(p_df),
     test_var = var
   ) %>%
     filter(!is.na(lfc), !is.na(p_val)) %>%
@@ -1102,281 +1009,63 @@ for (var in test_vars) {
   # Merge with genome metadata if available
   tidy_res <- left_join(tidy_res, genome_metadata, by = "genome")
   
+  reference = sample_data(mag_table_filtered)[[var]][1]
+  comparison <- sub(paste0("^lfc_", var), "", lfc_comp) %>% trimws()
+  
+  tidy_res <- tidy_res %>%
+  mutate(direction = case_when(
+    lfc > 0  ~ paste0(comparison),
+    lfc < 0  ~ paste0(reference),
+    TRUE     ~ "no difference"
+  ))
+  
+  sig_taxa = filter(tidy_res, p_val < 0.05)
+  
+  palette <- palette_list[[var]]
+  
+  sig_taxa <- sig_taxa %>%
+  mutate(
+    label = ifelse(!is.na(species) & species != "" & species != "s__", species,
+      ifelse(!is.na(genus)   & genus   != "" & genus   != "g__",   genus,
+      ifelse(!is.na(family)  & family  != "" & family  != "f__",  family,
+      ifelse(!is.na(order)   & order   != "" & order   != "o__",   order,
+      ifelse(!is.na(class)   & class   != "" & class   != "c__",   class,
+      ifelse(!is.na(phylum)  & phylum  != "",                         phylum,
+             genome
+      ))))))
+  ) %>%
+  # Step 3: ensure uniqueness for plotting
+  mutate(
+    label = ifelse(duplicated(label), paste0(label, " (", genome, ")"), label)
+  )
+  
+  da_plot = ggplot(sig_taxa, aes(x = reorder(label, lfc), y = lfc, fill = direction)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = signif_label), hjust = ifelse(sig_taxa$lfc > 0, -0.2, 1.2), color = "black", size = 3) +
+  coord_flip() +
+  scale_fill_manual(values = palette, labels = sig_taxa$direction) +
+  theme(panel.background = element_blank(),) +
+  labs(
+    x = "MAG",
+    y = "Log Fold Change",
+    title = paste0("Enrichment of Significant Taxa in ", var),
+    fill = "More abundant in"
+  ) +
+  theme(axis.text.x = element_text(hjust = 1),
+        axis.text.y = element_text(size = 6), 
+        legend.text  = element_text(size = 8),         # legend text
+        legend.title = element_text(size = 10, face = "bold"))
+  
+  ggsave(paste0("Figures/SubsettedData/DifferentialAbundance/", var, ".png"), plot = da_plot, width = 7, height = 4, dpi = 300)
+  
   # Store
   ancom_results[[var]] <- tidy_res
+  
 }
 
 # Combine into one table
 all_ancom_results <- bind_rows(ancom_results)
 
-# Example: significant results across variables
-sig_results <- all_ancom_results %>% filter(p_val < 0.05)
 ```
-### Differential Abundance of Bacteria by Species
-```{r ancom_species, warning=FALSE}
-phylo_metadata = data.frame(sample_metadata)
-phylo_metadata = column_to_rownames(phylo_metadata, var="sample")
-phylo_metadata = sample_data(phylo_metadata)
 
-phylo_mag = otu_table(column_to_rownames(genome_counts_filt, var="genome"), taxa_are_rows=TRUE)
-
-otu_mat <- as(otu_table(phylo_mag), "matrix")
-
-# Extract sample metadata as a dataframe
-meta_df <- as.data.frame(sample_data(phylo_metadata))
-
-# Make sure sample order matches
-sample_type_vec <- meta_df[colnames(otu_mat), "species"]
-
-within_group_var <- lapply(rownames(otu_mat), function(taxon) {
-  vals <- otu_mat[taxon, ]
-  tapply(vals, sample_type_vec)
-})
-names(within_group_var) <- rownames(otu_mat)
-
-# Convert to matrix (taxa x groups)
-var_matrix <- do.call(rbind, within_group_var)
-
-# Identify taxa with ALL zero or NA variance across groups
-zero_var_taxa <- rownames(var_matrix)[apply(var_matrix, 1, function(x) all(is.na(x) | x == 0))]
-
-# Remove those taxa
-otu_mat_filtered <- otu_mat[!rownames(otu_mat) %in% zero_var_taxa, ]
-phylo_mag_filtered <- prune_taxa(setdiff(taxa_names(phylo_mag), zero_var_taxa), phylo_mag)
-
-phylo_mag_filtered <- otu_table(otu_mat_filtered, taxa_are_rows=TRUE)
-mag_table <- phyloseq(phylo_mag_filtered, phylo_metadata)
-
-res <- ancombc2(
-  data = mag_table,
-  fix_formula = "species",
-  p_adj_method = "holm",
-  lib_cut = 20,
-  group = "species",
-  struc_zero = TRUE,
-  neg_lb = TRUE,
-  alpha = 0.05,
-  global = FALSE,
-  verbose = TRUE
-)
-
-
-# View results
-lfc_res <- as.data.frame(res$res$taxon)
-colnames(lfc_res)[1] = "Function"
-rownames(lfc_res) = lfc_res$Function
-lfc_res$Function = NULL
-
-lfc_res = mutate(lfc_res, lfc = res$res$'lfc_speciesCoragyps atratus')
-lfc_res = mutate(lfc_res, p_val = res$res$'p_speciesCoragyps atratus')
-
-# See significant taxa
-sig_taxa_species = filter(lfc_res, p_val < 0.05)
-print(sig_taxa_species)
-sig_taxa_species$genome = rownames(sig_taxa_species)
-
-sig_taxa_species = merge(sig_taxa_species, genome_metadata, by = "genome")
-sig_taxa_species$signif_label <- cut(sig_taxa_species$p_val, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", ""))
-
-# Bar plot of significant taxa (ordered by log fold change)
-ggplot(sig_taxa_species, aes(x = reorder(genome, lfc), y = lfc, fill = lfc > 0)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  geom_text(aes(label = signif_label), hjust = ifelse(sig_taxa_species$lfc > 0, -0.2, 1.2), color = "black", size = 4) +
-  coord_flip() +
-  scale_fill_manual(values = species_colors, labels = c("Cathartes aura", "Coragyps atratus")) +
-  theme_minimal() +
-  labs(
-    x = "MAG",
-    y = "Log Fold Change",
-    title = "Enrichment of Significant Taxa",
-    fill = "More abundant in"
-  ) +
-  theme(axis.text.x = element_text(hjust = 1))
-
-```
-### Differential Abundance of Bacteria by Species (Stomach, Male, Texas fixed)
-```{r ancom_stomach_male_texas, eval=FALSE}
-phylo_metadata = data.frame(sample_metadata)
-phylo_metadata = column_to_rownames(phylo_metadata, var="sample")
-
-#Subset metadata
-phylo_metadata = phylo_metadata %>% filter(sample_type == "Stomach contents", sex == "Male", state == "Texas")
-phylo_metadata = sample_data(phylo_metadata)
-#Subset count data to match metadata
-subset_counts = column_to_rownames(genome_counts_filt, var="genome")
-subset_counts = subset_counts[, colnames(subset_counts) %in% rownames(phylo_metadata)]
-
-phylo_mag = otu_table(subset_counts, taxa_are_rows=TRUE)
-
-otu_mat <- as(otu_table(phylo_mag), "matrix")
-
-# Extract sample metadata as a dataframe
-meta_df <- as.data.frame(sample_data(phylo_metadata))
-
-# Make sure sample order matches
-sample_type_vec <- meta_df[colnames(otu_mat), "species"]
-
-within_group_var <- lapply(rownames(otu_mat), function(taxon) {
-  vals <- otu_mat[taxon, ]
-  tapply(vals, sample_type_vec)
-})
-names(within_group_var) <- rownames(otu_mat)
-
-# Convert to matrix (taxa x groups)
-var_matrix <- do.call(rbind, within_group_var)
-
-# Identify taxa with ALL zero or NA variance across groups
-zero_var_taxa <- rownames(var_matrix)[apply(var_matrix, 1, function(x) all(is.na(x) | x == 0))]
-otu_mat_filtered <- otu_mat[!rownames(otu_mat) %in% zero_var_taxa, ]
-
-#Remove samples with only 0 counts
-nonzero_sample_mask <- colSums(otu_mat_filtered) > 0
-otu_mat_final <- otu_mat_filtered[, nonzero_sample_mask]
-
-# Remove 0 count and variation taxa
-phylo_mag_filtered <- prune_taxa(setdiff(taxa_names(phylo_mag), zero_var_taxa), phylo_mag)
-
-phylo_mag_filtered <- otu_table(otu_mat_final, taxa_are_rows=TRUE)
-mag_table <- phyloseq(phylo_mag_filtered, phylo_metadata)
-
-res <- ancombc2(
-  data = mag_table,
-  fix_formula = "species",
-  p_adj_method = "holm",
-  lib_cut = 20,
-  group = "species",
-  struc_zero = TRUE,
-  neg_lb = TRUE,
-  alpha = 0.05,
-  global = FALSE,
-  verbose = TRUE
-)
-
-
-# View results
-lfc_res <- as.data.frame(res$res$taxon)
-colnames(lfc_res)[1] = "Function"
-rownames(lfc_res) = lfc_res$Function
-lfc_res$Function = NULL
-
-lfc_res = mutate(lfc_res, lfc = res$res$'lfc_speciesCoragyps atratus')
-lfc_res = mutate(lfc_res, p_val = res$res$'p_speciesCoragyps atratus')
-
-# See significant taxa
-sig_taxa_species = filter(lfc_res, p_val < 0.05)
-print(sig_taxa_species)
-sig_taxa_species$genome = rownames(sig_taxa_species)
-
-sig_taxa_species = merge(sig_taxa_species, genome_metadata, by = "genome")
-sig_taxa_species$signif_label <- cut(sig_taxa_species$p_val, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", ""))
-
-# Bar plot of significant taxa (ordered by log fold change)
-ggplot(sig_taxa_species, aes(x = reorder(genome, lfc), y = lfc, fill = lfc > 0)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  geom_text(aes(label = signif_label), hjust = ifelse(sig_taxa_species$lfc > 0, -0.2, 1.2), color = "black", size = 4) +
-  coord_flip() +
-  scale_fill_manual(values = species_colors, labels = c("Cathartes aura", "Coragyps atratus")) +
-  theme_minimal() +
-  labs(
-    x = "MAG",
-    y = "Log Fold Change",
-    title = "Enrichment of Significant Taxa",
-    fill = "More abundant in"
-  ) +
-  theme(axis.text.x = element_text(hjust = 1))
-```
-### Differential Abundance of Bacteria by Species (Stomach fixed)
-```{r ancom_species_stomach, eval=FALSE}
-phylo_metadata = data.frame(sample_metadata)
-phylo_metadata = column_to_rownames(phylo_metadata, var="sample")
-
-#Subset metadata
-phylo_metadata = phylo_metadata %>% filter(sample_type == "Stomach contents")
-phylo_metadata = sample_data(phylo_metadata)
-#Subset count data to match metadata
-subset_counts = column_to_rownames(genome_counts_filt, var="genome")
-subset_counts = subset_counts[, colnames(subset_counts) %in% rownames(phylo_metadata)]
-
-phylo_mag = otu_table(subset_counts, taxa_are_rows=TRUE)
-
-otu_mat <- as(otu_table(phylo_mag), "matrix")
-
-# Extract sample metadata as a dataframe
-meta_df <- as.data.frame(sample_data(phylo_metadata))
-
-# Make sure sample order matches
-sample_type_vec <- meta_df[colnames(otu_mat), "species"]
-
-within_group_var <- lapply(rownames(otu_mat), function(taxon) {
-  vals <- otu_mat[taxon, ]
-  tapply(vals, sample_type_vec)
-})
-names(within_group_var) <- rownames(otu_mat)
-
-# Convert to matrix (taxa x groups)
-var_matrix <- do.call(rbind, within_group_var)
-
-# Remove taxa with ALL zero or NA variance across groups
-zero_var_taxa <- rownames(var_matrix)[apply(var_matrix, 1, function(x) all(is.na(x) | x == 0))]
-otu_mat_filtered <- otu_mat[!rownames(otu_mat) %in% zero_var_taxa, ]
-
-# Remove samples with only 0 counts
-nonzero_sample_mask <- colSums(otu_mat_filtered) > 0
-otu_mat_final <- otu_mat_filtered[, nonzero_sample_mask]
-
-# --- NEW STEP: Remove taxa with zero variance globally ---
-global_zero_var_taxa <- rownames(otu_mat_final)[apply(otu_mat_final, 1, function(x) var(x) == 0)]
-otu_mat_final <- otu_mat_final[!rownames(otu_mat_final) %in% global_zero_var_taxa, ]
-
-# Build phyloseq object
-phylo_mag_filtered <- otu_table(otu_mat_final, taxa_are_rows=TRUE)
-mag_table <- phyloseq(phylo_mag_filtered, phylo_metadata)
-
-# Run ANCOMBC2
-res <- ancombc2(
-  data = mag_table,
-  fix_formula = "species",
-  p_adj_method = "holm",
-  lib_cut = 20,
-  group = "species",
-  struc_zero = TRUE,
-  neg_lb = TRUE,
-  alpha = 0.05,
-  global = FALSE,
-  verbose = TRUE
-)
-
-
-# View results
-lfc_res <- as.data.frame(res$res$taxon)
-colnames(lfc_res)[1] = "Function"
-rownames(lfc_res) = lfc_res$Function
-lfc_res$Function = NULL
-
-lfc_res = mutate(lfc_res, lfc = res$res$'lfc_speciesCoragyps atratus')
-lfc_res = mutate(lfc_res, p_val = res$res$'p_speciesCoragyps atratus')
-
-# See significant taxa
-sig_taxa_species = filter(lfc_res, p_val < 0.05)
-print(sig_taxa_species)
-sig_taxa_species$genome = rownames(sig_taxa_species)
-
-sig_taxa_species = merge(sig_taxa_species, genome_metadata, by = "genome")
-sig_taxa_species$signif_label <- cut(sig_taxa_species$p_val, breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), labels = c("***", "**", "*", ""))
-
-# Bar plot of significant taxa (ordered by log fold change)
-ggplot(sig_taxa_species, aes(x = reorder(genome, lfc), y = lfc, fill = lfc > 0)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  geom_text(aes(label = signif_label), hjust = ifelse(sig_taxa_species$lfc > 0, -0.2, 1.2), color = "black", size = 4) +
-  coord_flip() +
-  scale_fill_manual(values = species_colors, labels = c("Cathartes aura", "Coragyps atratus")) +
-  theme_minimal() +
-  labs(
-    x = "MAG",
-    y = "Log Fold Change",
-    title = "Enrichment of Significant Taxa",
-    fill = "More abundant in"
-  ) +
-  theme(axis.text.x = element_text(hjust = 1))
-```
 

@@ -73,6 +73,7 @@ library(ggtree)
 library(ggh4x)
 library(pheatmap)
 library(stringr)
+library(viridis)
 
 # For statistics
 library(spaa)
@@ -85,4 +86,6 @@ library(ANCOMBC)
 library(lme4)
 library(FSA)
 library(broom)
+library(emmeans)
+
 ```

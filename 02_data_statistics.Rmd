@@ -24,12 +24,12 @@ sequence_fractions <- read_counts %>%
   group_by(sample) %>%
   summarise(mags = sum(value)) %>%
 	left_join(sample_metadata, by = join_by(sample == sample)) %>%
-	select(sample,mags,metagenomic_bases,host_bases,bases_lost_fastp_percent) %>%
+	dplyr::select(sample,mags,metagenomic_bases,host_bases,bases_lost_fastp_percent) %>%
 	mutate(mags_bases = mags*146) %>%
 	mutate(lowqual_bases = ((metagenomic_bases+host_bases)/(1-bases_lost_fastp_percent))-(metagenomic_bases+host_bases)) %>%
 	mutate(unmapped_bases = metagenomic_bases - mags_bases) %>%
 	mutate(unmapped_bases = ifelse(unmapped_bases < 0, 0, unmapped_bases)) %>%
-	select(sample, lowqual_bases, host_bases, unmapped_bases, mags_bases)
+	dplyr::select(sample, lowqual_bases, host_bases, unmapped_bases, mags_bases)
 
 sequence_fractions %>%
   mutate_at(vars(-sample), ~./1000000000) %>%
@@ -129,7 +129,7 @@ singlem_table <- sequence_fractions %>%
 	mutate(mags_proportion = round((mags_bases / (mags_bases + unmapped_bases))*100,2)) %>%
 	left_join(sample_metadata, by = join_by(sample == sample))  %>%
 	mutate(singlem_proportion = round(singlem_fraction*100,2)) %>%
-	select(sample,mags_proportion,singlem_proportion) %>%
+	dplyr::select(sample,mags_proportion,singlem_proportion) %>%
 	mutate(mags_proportion = ifelse(singlem_proportion == 0, 0, mags_proportion)) %>% #convert zeros to NA
 	mutate(singlem_proportion = ifelse(singlem_proportion == 0, NA, singlem_proportion)) %>% #convert zeros to NA
 	mutate(singlem_proportion = ifelse(singlem_proportion < mags_proportion, NA, singlem_proportion)) %>% #if singlem is smaller, then NA, to simplify plot

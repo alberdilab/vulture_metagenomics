@@ -123,15 +123,15 @@ colors = read_tsv("https://raw.githubusercontent.com/earthhologenome/EHI_taxonom
 phylum_colors <- colors %>%
     right_join(genome_metadata, by=join_by(phylum == phylum)) %>%
     arrange(match(genome, genome_tree$tip.label)) %>%
-    select(phylum, colors) %>% 
+    dplyr::select(phylum, colors) %>% 
     unique() %>%
     arrange(phylum) %>%
     pull(colors, name=phylum)
 #Colors for samples
 species_colors = c("#d83034", "#0d0d0d")
 sampletype_colors = c("#f45f74", "#008dff")
-sex_colors = c("#bdd373", "#003a7d")
-state_colors = c("#D55E00", "#CC79A7")
+sex_colors = c("#D55E00", "#CC79A7")
+state_colors = c("#bdd373", "#003a7d")
 
 ```
 

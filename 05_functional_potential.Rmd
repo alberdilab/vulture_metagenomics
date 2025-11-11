@@ -43,10 +43,6 @@ GIFTs_functions_community_no0 %>%
         facet_grid(sample_type ~ ., scales="free",space="free")
 ```
 
-
-
-
-
 ### Element Level
 ```{r element_level_gift, fig.height=12, fig.width=8, fig.fullwidth=TRUE}
 #Filter out samples with only 0 GIFT scores
@@ -229,51 +225,12 @@ ggplot(heatmap_data, aes(x=sample, y=paste0(trait, " ", sig_wilcox_sample$p_labe
 
 ```
 
-## Function Matrix of sample type (Cathartes aura fixed)
-```{r Function_Distance_Matrix_caura_sample }
-GIFTs_caura = GIFTs_elements_community_no0[which(rownames(GIFTs_elements_community_no0) %in% metadata_caura$sample),]
-
-dist_func = vegdist(GIFTs_caura, method ="bray" )
-
-group_neutral = metadata_caura[na.omit(match(metadata_caura$sample, names(beta_q1n_caura$S))),]
-
-adonis2(dist_func ~ group_neutral$sample_type, 
-        data = as.data.frame(GIFTs_caura) %>% arrange(match(group_neutral$sample,labels(beta_q1n_caura$S))), 
-        permutations = 999) %>%
-        broom::tidy() %>%
-        tt()
-betadisper(dist_func, group_neutral$sample_type) %>% permutest()
-
-set.seed(123)
-nmds_result <- metaMDS(dist_func, k = 2, trymax = 100)
-nmds_scores <- as.data.frame(nmds_result$points)
-
-#GIFT ordination by sample type
-nmds_scores$Group <- group_neutral$sample_type
-
-x_cen = mean(nmds_scores$MDS1, na.rm = TRUE)
-y_cen = mean(nmds_scores$MDS2, na.rm = TRUE)
-ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = Group)) +
-  geom_point(size = 4) +
-  scale_color_manual(values = sampletype_colors) +
-  geom_segment(aes(x = x_cen, y = y_cen, xend = MDS1, yend = MDS2), alpha = 0.9) +
-  theme(
-    axis.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 10),
-    panel.background = element_blank(),
-    axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
-    legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12),
-    legend.position = "right", legend.box = "vertical"
-    )
-```
-
 ``` {r Function_Matrix_All_Pairwise}
 GIFTs_test = GIFTs_elements_community_no0
 metadata_test = sample_metadata
 
 # Metadata variables you want to test
-vars <- c("species", "state", "sample_type")
+vars <- c("species", "sample_type", "state")
 
 palette_list <- list(
   species = species_colors,
@@ -320,7 +277,7 @@ for (var in vars) {
     )
     ad_df <- broom::tidy(ad) %>%
       mutate(variable = var,
-             fixed = paste(paste0(names(combo), "=", combo), collapse = ", "))
+             fixed = paste(paste0(combo), collapse = ", "))
     results_adonis[[paste(var, i, sep = "_")]] <- ad_df
     
     ## --- Betadisper ---
@@ -357,14 +314,25 @@ centroids <- nmds_scores %>%
 nmds_scores <- nmds_scores %>%
   left_join(centroids, by = var)
 
+  combo_label <- paste0(combos[i, ], collapse = " and ")
+  plot_title  <- paste("GIFT Diversity of", var, "controlling", combo_label) %>% 
+    str_wrap(width = 45) 
+
 p <- ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = !!sym(var))) +
   geom_point(size = 4) +
-  geom_segment(aes(x = x_cen, y = y_cen,
-                   xend = MDS1, yend = MDS2),
-               alpha = 0.6) +
+  stat_ellipse(type = "norm", linetype = 2) + 
+      annotate("text", x = Inf, y = -Inf, label = paste0("p = ", signif(ad_df$p.value[1], 3)), hjust = 1.1, vjust = -0.5, size = 4) + 
   scale_color_manual(values = palette) +
-  theme(panel.background = element_blank(),) +
-  labs(title = str_wrap(title_text, width = 60),
+  theme(
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 10),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5, colour = "black"),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.position = "right"
+      ) +
+  labs(title = str_wrap(plot_title, width = 45),
        color = var)
     
 fixed_text <- paste(combo, collapse = "_")
@@ -376,11 +344,11 @@ filename <- gsub(" ", "_", filename)
 }
 
 # Bind results
-adonis_results <- bind_rows(results_adonis)
+functional_adonis <- bind_rows(results_adonis)
 betadisper_results <- bind_rows(results_betadisper)
 
 # View results
-print(adonis_results)
+functional_adonis
 print(betadisper_results)
 ```
 
@@ -394,13 +362,12 @@ element_gift <- GIFTs_elements_community_no0 %>%
 meta_vars <- c("state", "sample_type", "species")
 results_list <- list()
 
-palette_list <- list(
-  state = state_colors ,
-  sample_type = sampletype_colors,
-  species = species_colors
-)
-
 uniqueGIFT_db<- unique(GIFT_db2) %>% unite("Function",Function:Element, sep= "_", remove=FALSE)
+uniqueGIFT_db$DomainSplit = sub("_.*", "", uniqueGIFT_db$Function)
+
+Domains <- unique(uniqueGIFT_db$DomainSplit)
+Domain_colors <- setNames(viridis(length(Domains), option = "plasma"), Domains)
+
 
 for (var in meta_vars) {
   fixed_vars <- setdiff(meta_vars, var)
@@ -441,6 +408,8 @@ for (var in meta_vars) {
       ) %>%
       filter(!is.na(p_value))
     
+    
+    
     if (nrow(sig_wilcox) == 0) next
     sig_wilcox <- sig_wilcox %>%
       mutate(p_label = case_when(
@@ -454,8 +423,8 @@ for (var in meta_vars) {
     sig_wilcox <- sig_wilcox %>%
     mutate(negLogP = -log10(p_adjust))
     
-    sig_wilcox$Element = sub(".*?_", "", uniqueGIFT_db$Function[match(sig_wilcox$trait, uniqueGIFT_db$Code_element)])
-    sig_wilcox$Domain = sub("_.*", "", uniqueGIFT_db$Function[match(sig_wilcox$trait, uniqueGIFT_db$Code_element)])
+    sig_wilcox$Element = uniqueGIFT_db$Element[match(sig_wilcox$trait, uniqueGIFT_db$Code_element)]
+    sig_wilcox$Domain = uniqueGIFT_db$DomainSplit[match(sig_wilcox$trait, uniqueGIFT_db$Code_element)]
 
     
     results_list[[paste(var, combo$species, combo$state, combo$sample_type, sep = "_")]] <- sig_wilcox
@@ -468,7 +437,7 @@ for (var in meta_vars) {
                 by = "trait")
     
     
-    if(sum(heatmap_data$p_adjust <= 0.05) > 1){
+    if(sum(heatmap_data$p_adjust <= 0.05) > 0){
       
     heatmap_sig = heatmap_data[heatmap_data$p_adjust <= 0.05,]
     
@@ -494,7 +463,7 @@ for (var in meta_vars) {
     
     #Volcano Plot
     
-    if(sum(sig_wilcox$p_adjust <= 0.05) > 1){
+    if(sum(sig_wilcox$p_adjust <= 0.05) > 0){
       
     sig_sig_wilcox = sig_wilcox[sig_wilcox$p_adjust <= 0.05,]
     
@@ -507,12 +476,11 @@ for (var in meta_vars) {
       plot.background = element_rect(fill = "white", color = NA)
     ) +
     labs(
-      title = paste("Volcano Plot:", var, "Fixed:", paste(combo[fixed_vars], collapse = ", ")),
+      title = paste("Volcano Plot comparing", var, "with", paste(combo[fixed_vars], collapse = " and "), "fixed"),
       x = "GIFT Difference",
       y = "-Log10(Adjusted P-value)",
-      color = "Funcational Domain"
-    ) +
-    scale_color_brewer(palette = "Set2") +
+      color = "Functional Domain"
+    ) + scale_color_manual(values = Domain_colors) +
     theme(plot.title = element_text(hjust = 0.5))
   
     # Save volcano plot
@@ -524,8 +492,5 @@ for (var in meta_vars) {
 
 # Optionally, combine all results into one table
 all_results <- bind_rows(results_list, .id = "comparison_id")
-
-
-
 
 ```

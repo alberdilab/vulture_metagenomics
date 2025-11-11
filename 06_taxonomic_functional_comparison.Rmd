@@ -1,0 +1,38 @@
+
+### Compare significance of taxonomic and functional diversities
+```{r p_value line}
+merged_p <- merge(
+  select(functional_adonis[is.na(functional_adonis$p.value) == FALSE, ], variable, fixed, p.value) %>% rename(p_functional = p.value),
+  select(taxonomic_adonis[is.na(taxonomic_adonis$p.value) == FALSE, ], variable, fixed, p.value) %>% rename(p_taxonomic = p.value),
+  by = c("variable", "fixed")
+)
+
+merged_p <- merged_p %>%
+  mutate(
+    neglog_p_functional = -log10(p_functional),
+    neglog_p_taxonomic = -log10(p_taxonomic)
+  )
+
+ggplot(merged_p, aes(x = neglog_p_taxonomic, y = neglog_p_functional)) +
+  geom_jitter(aes(color = variable), alpha = 0.7, size = 2, width = 0.1, height = 0.1) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  geom_smooth(method = "lm", se = TRUE, color = "black", linewidth = 0.8) + 
+  geom_vline(xintercept = -log10(0.05), linetype = "dashed", color = "red", linewidth = 0.4) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "red", linewidth = 0.4) +
+  theme_minimal() +
+  theme(
+      panel.background = element_rect(fill = "white", color = NA),
+      plot.background = element_rect(fill = "white", color = NA)
+    ) +
+  labs(
+    title = str_wrap("Comparison of p-values between Taxonomic and Functional Diversity", width = 45),
+    x = "Taxonomic Diveristy (-log10(p-value))",
+    y = "Functional Diversity (-log10(p-value))",
+    color = "Metadata Comparison"
+  ) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggsave("Figures/SubsettedData/TaxonomicFunctionalCorrelation.png", width = 6, height = 5, dpi = 300)
+
+```
+
