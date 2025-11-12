@@ -3,7 +3,7 @@
 # Prepare data
 
 ## Load data
-
+®®
 Load the original data files outputted by the bioinformatic pipeline.
 
 ### Sample metadata

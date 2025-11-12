@@ -230,7 +230,7 @@ GIFTs_test = GIFTs_elements_community_no0
 metadata_test = sample_metadata
 
 # Metadata variables you want to test
-vars <- c("species", "sample_type", "state")
+vars <- c("species", "sample_type")
 
 palette_list <- list(
   species = species_colors,
@@ -357,9 +357,9 @@ print(betadisper_results)
 element_gift <- GIFTs_elements_community_no0 %>% 
   as.data.frame() %>% 
   rownames_to_column(., "sample") %>% 
-  left_join(sample_metadata[c("sample","sample_type","species","state")], by="sample")
+  left_join(sample_metadata[c("sample","sample_type","species")], by="sample")
 
-meta_vars <- c("state", "sample_type", "species")
+meta_vars <- c("sample_type", "species")
 results_list <- list()
 
 uniqueGIFT_db<- unique(GIFT_db2) %>% unite("Function",Function:Element, sep= "_", remove=FALSE)
@@ -367,6 +367,7 @@ uniqueGIFT_db$DomainSplit = sub("_.*", "", uniqueGIFT_db$Function)
 
 Domains <- unique(uniqueGIFT_db$DomainSplit)
 Domain_colors <- setNames(viridis(length(Domains), option = "plasma"), Domains)
+  
 
 
 for (var in meta_vars) {
@@ -375,7 +376,7 @@ for (var in meta_vars) {
     distinct(across(all_of(fixed_vars)))
   
   for (i in seq_len(nrow(fixed_combos))) {
-    combo <- fixed_combos[i, ]
+    combo <- as.list(fixed_combos[i, , drop = FALSE])
     subset_df <- element_gift %>%
       filter(across(all_of(fixed_vars), ~ .x == combo[[cur_column()]]))
     
@@ -427,7 +428,7 @@ for (var in meta_vars) {
     sig_wilcox$Domain = uniqueGIFT_db$DomainSplit[match(sig_wilcox$trait, uniqueGIFT_db$Code_element)]
 
     
-    results_list[[paste(var, combo$species, combo$state, combo$sample_type, sep = "_")]] <- sig_wilcox
+   results_adonis[[paste(var, i, sep = "_")]] <- sig_wilcox
     
     #Heatmap
     heatmap_data <- subset_df %>%
