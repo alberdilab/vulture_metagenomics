@@ -9,14 +9,16 @@ Load the original data files outputted by the bioinformatic pipeline.
 ### Sample metadata
 
 ```{r load_sample_metadata, warning=FALSE, comments="", message=FALSE}
-sample_metadata <- read_tsv("data/DMB0117_metadata.tsv.gz") %>%
+sample_metadata <- read_tsv("ComparisonDatasets/DMB0182_metadata.tsv") %>%
     rename(sample=1)
 individuals = read.csv("vulture_individuals.csv")
+
+comp_metadata = 
 
 #Add State data
 sample_metadata$state = substr(word(sample_metadata$region),1,nchar(word(sample_metadata$region))-1)
 #Join sample number with metadata
-sample_metadata = left_join(sample_metadata, individuals, by = "sample")
+#sample_metadata = left_join(sample_metadata, individuals, by = "sample")
 
 removed_samples = sample_metadata[which(sample_metadata$metagenomic_bases==0),]$sample
 ```
@@ -24,7 +26,7 @@ removed_samples = sample_metadata[which(sample_metadata$metagenomic_bases==0),]$
 ### Read counts
 
 ```{r load_read_counts, warning=FALSE, comments="", message=FALSE}
-read_counts <- read_tsv("data/DMB0117_counts.tsv.gz") %>%
+read_counts <- read_tsv("ComparisonDatasets/DMB0182_counts.tsv") %>%
     rename(genome=1)
 read_counts = read_counts[,-which(match(colnames(read_counts), removed_samples)!=0)]
 ```
@@ -32,7 +34,7 @@ read_counts = read_counts[,-which(match(colnames(read_counts), removed_samples)!
 ### Genome base hits
 
 ```{r load_genome_hits, warning=FALSE, comments="", message=FALSE}
-genome_coverage <- read_tsv("data/DMB0117_coverage.tsv.gz") %>%
+genome_coverage <- read_tsv("ComparisonDatasets/DMB0182_coverage.tsv") %>%
     rename(genome=1)
 genome_coverage = genome_coverage[,-which(match(colnames(genome_coverage), removed_samples)!=0)]
 ```
@@ -40,7 +42,7 @@ genome_coverage = genome_coverage[,-which(match(colnames(genome_coverage), remov
 ### Genome taxonomy
 
 ```{r load_genome_metadata, warning=FALSE, comments="", message=FALSE}
-genome_metadata <- read_tsv("data/DMB0117_mag_info.tsv.gz") %>%
+genome_metadata <- read_tsv("ComparisonDatasets/DMB0182_mag_info.tsv") %>%
     rename(length=mag_size)
 
 genome_summary = genome_metadata
@@ -49,7 +51,7 @@ genome_summary = genome_metadata
 ### Genome tree
 
 ```{r load_genome_tree, warning=FALSE, comments="", message=FALSE}
-genome_tree <- read_tree("data/DMB0117.tree")
+genome_tree <- read_tree("ComparisonDatasets/DMB0182.tree")
 genome_tree$tip.label <- str_replace_all(genome_tree$tip.label,"'", "") #remove single quotes in MAG names
 genome_tree <- keep.tip(genome_tree, tip=genome_metadata$genome) # keep only MAG tips
 ```
@@ -70,7 +72,7 @@ Downloading individual annotation files from ERDA using information in Airtable 
 ```
 
 ```{r load_genome_annotations, warning=FALSE, comments="", message=FALSE}
-genome_annotations <- read_tsv("data/genome_annotations.tsv.xz") %>%
+genome_annotations <- read_tsv("ComparisonDatasets/genome_annotations.tsv.xz") %>%
     rename(gene=1, genome=2, contig=3)
 ```
 
