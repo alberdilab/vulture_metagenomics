@@ -108,6 +108,7 @@ attr(heatmap_rel, "scaled:scale") <- NULL
 
 #pheatmap(as.matrix(heatmap_rel), annotation_col = lapply(sample_metadata, factor), annotation_colors = list(data.frame(species = c("Cathartes aura", "Coragyps atratus"), sample_type = c("Stomach contents", "Colon contents"), state = c("Texas", "Flroida"))), scale = "none")
 
+heatmap_rel <- heatmap_rel[complete.cases(heatmap_rel), ]
 heatmap(as.matrix(heatmap_rel), scale="none")
 
 ```
@@ -151,7 +152,7 @@ length(setdiff(unique(colon_count$genome), unique(stomach_count$genome)))
 
 ## Summary Family
 
-```{r taxonomy_family_summary, warning=FALSE, comments="", message=FALSE}
+```{r taxonomy_family_summary, message=FALSE, warning=FALSE, comments=""}
 family_summary <- genome_counts_filt %>%
   mutate_at(vars(-genome),~./sum(.)) %>% #apply TSS nornalisation
   pivot_longer(-genome, names_to = "sample", values_to = "count") %>% #reduce to minimum number of columns
@@ -306,12 +307,24 @@ color_pal <- c("#000000","#004949","#009292","#ff6db6","#ffb6db",
 
 ### Plot Alpha Diversity
 
+## Alpha Diversity all species
 ```{r alpha_div_plot, comment="", message=FALSE, warning=FALSE, fig.height=3, fig.width=10, fig.fullwidth=TRUE}
 metadata_test = sample_metadata
 #Change columns here for subetting
+metadata_test <- sample_metadata[which(sample_metadata$sample_type == "Colon contents" | sample_metadata$sample_type == "Faecal"),]
+metadata_test = metadata_test %>%
+  mutate(color = case_when(
+    species == "Cathartes aura" ~ "#d83034", 
+    species == "Coragyps atratus" ~ "#0d0d0d", 
+    species == "Canis familiaris" ~ "#bdd373", 
+    species == "Perisoreus infaustus" ~ "#003a7d", 
+    species == "Psittacula echo" ~ "#aa89e3", 
+    species == "Trichosurus vulpecula" ~ "#cc0099"
+  ))
 metadata_test$group = with(metadata_test, paste(species, sample_type, sep = "_"))
 
 
+alpha_div = alpha_div[match(metadata_test$sample, alpha_div$sample),]
 alpha_df <- alpha_div %>%
   left_join(metadata_test, by = "sample") %>% 
   mutate(richness_log = log(richness + 1)) %>% 
@@ -351,7 +364,6 @@ pairwise_table <- pairwise_table %>%
 pairwise_table$y.position <- max(alpha_df$functional_log) * 1.1 + 
                              seq(0, 0.1, length.out = nrow(pairwise_table))
 
-
 }
 
 #Plot differences
@@ -360,12 +372,20 @@ alpha_plot = alpha_div %>%
   left_join(., metadata_test, by = join_by(sample == sample)) %>%
   mutate(metric=factor(metric,levels=c("richness","neutral","phylogenetic","functional"))) %>%
   unite("group", group, remove = FALSE) %>%
-      ggplot(aes(y = value, x = group, group=group, color=group, fill=group)) +
+      ggplot(aes(y = value, x = species, color = color, fill = color)) +
       geom_boxplot(outlier.shape = NA) +
-  stat_summary(fun.y = mean, color = "black", geom = "point", shape = 21, fill = "white",)+
+  stat_summary(fun.y = mean, color = "black", geom = "point", shape = 21, fill = "white",) +
       geom_jitter(alpha=0.5) +
-      scale_color_manual(name = "Group", values = color_pal) +
-      scale_fill_manual(name = "Group", values = color_pal) +
+      scale_fill_identity(
+    guide = "legend",
+    name = "Host Species",
+    labels = unique(metadata_test$species),
+    breaks = unique(metadata_test$color)) +
+  scale_color_identity(
+    guide = "legend",
+    name = "Host Species",
+    labels = unique(metadata_test$species),
+    breaks = unique(metadata_test$color)) + 
       facet_wrap(. ~ metric, scales = "free", ncol=4) +
       coord_cartesian(xlim = c(1, NA)) +
       theme_classic() +
@@ -414,10 +434,19 @@ beta_q1f <- genome_counts_filt %>%
   hillpair(., q = 1, dist = dist)
 ```
 
-### Richness (No Sex, Metadata fixed)
-``` {r richness_no_sex, warning=FALSE, comments="", message=FALSE}
+### Richness (All species)
+``` {r richness_all_species, warning=FALSE, comments="", message=FALSE}
 # Example metadata and counts
-metadata_test <- sample_metadata 
+metadata_test <- sample_metadata[which(sample_metadata$sample_type == "Colon contents" | sample_metadata$sample_type == "Faecal"),]
+metadata_test = metadata_test %>%
+  mutate(color = case_when(
+    species == "Cathartes aura" ~ "#d83034", 
+    species == "Coragyps atratus" ~ "#0d0d0d", 
+    species == "Canis familiaris" ~ "#bdd373", 
+    species == "Perisoreus infaustus" ~ "#003a7d", 
+    species == "Psittacula echo" ~ "#aa89e3", 
+    species == "Trichosurus vulpecula" ~ "#cc0099"
+  ))
 
 genome_counts_test <- genome_counts_filt %>%
   column_to_rownames(var = "genome")
@@ -426,7 +455,7 @@ genome_counts_test <- genome_counts_filt %>%
 genome_counts_test <- genome_counts_test[, colnames(genome_counts_test) %in% metadata_test$sample]
 
 # Metadata columns to test (must each have exactly 2 unique values)
-grouping_vars <- c("species", "sample_type")  # adjust as needed
+grouping_vars <- c("species")  # adjust as needed
 
 # Different palettes for each variable
 palette_list <- list(
@@ -509,14 +538,17 @@ ad <- adonis2(
 results_adonis[[paste(var, i, sep = "_")]] <- ad
   
     combo_label <- paste0(combos[i, ], collapse = " and ")
-    plot_title  <- paste("Richness of", var, "controlling", combo_label) %>% 
+    plot_title  <- paste("Richness of", var, "distal gut microbiome") %>% 
       str_wrap(width = 45) 
 
-    p <- ggplot(scores_df, aes(x = NMDS1, y = NMDS2, color = .data[[var]])) +
+    p <- ggplot(scores_df, aes(x = NMDS1, y = NMDS2, color = color)) +
       geom_point(size = 4) +
       stat_ellipse(type = "norm", linetype = 2) + 
       annotate("text", x = Inf, y = -Inf, label = paste0("R2 = ", round(ad$R2[1], 3), " p = ", signif(ad$p.value[1], 3)), hjust = 1.1, vjust = -0.5, size = 4) + 
-      scale_color_manual(values = palette_list[[var]]) +
+      scale_color_identity(guide = "legend",
+       name = "Host Species",
+       labels = unique(scores_df$species),   # replace with your real column
+       breaks = unique(scores_df$color)) +
       geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
       theme(
         axis.title = element_text(size = 12, face = "bold"),
@@ -533,7 +565,7 @@ results_adonis[[paste(var, i, sep = "_")]] <- ad
     
     # Save
     fixed_text <- paste(combos, collapse = "_")
-   filename <- paste0("Figures/SubsettedData/BetaDiv2subsets/", "Richness_", var, "_", 
+   filename <- paste0("Figures/SubsettedData/BetaDiv2subsets/", "Richness_all_", var, 
                    paste0(combos[i, ], collapse = "_"), ".png")
    filename <- gsub(" ", "_", filename)
     ggsave(filename, plot = p, width = 6, height = 5, dpi = 300)
@@ -648,10 +680,18 @@ ggplot(scores_df, aes(NMDS1, NMDS2, color = group, shape = sample_type)) +
 
 ```
 
-### Neutral Diversity (No Sex, Metadata fixed)
-``` {r neutral_div_no_sex, warning=FALSE, comments="", message=FALSE}
-# Example metadata and counts
-metadata_test <- sample_metadata 
+### Neutral Diversity (all species)
+``` {r neutral_div_all_species, warning=FALSE, comments="", message=FALSE}
+metadata_test <- sample_metadata[which(sample_metadata$sample_type == "Colon contents" | sample_metadata$sample_type == "Faecal" & sample_metadata$species != "Perisoreus infaustus"),]
+metadata_test = metadata_test %>%
+  mutate(color = case_when(
+    species == "Cathartes aura" ~ "#d83034", 
+    species == "Coragyps atratus" ~ "#0d0d0d", 
+    species == "Canis familiaris" ~ "#bdd373", 
+    species == "Perisoreus infaustus" ~ "#003a7d", 
+    species == "Psittacula echo" ~ "#aa89e3", 
+    species == "Trichosurus vulpecula" ~ "#cc0099"
+  ))
 
 genome_counts_test <- genome_counts_filt %>%
   column_to_rownames(var = "genome")
@@ -660,7 +700,7 @@ genome_counts_test <- genome_counts_filt %>%
 genome_counts_test <- genome_counts_test[, colnames(genome_counts_test) %in% metadata_test$sample]
 
 # Metadata columns to test (must each have exactly 2 unique values)
-grouping_vars <- c("species", "sample_type")  # adjust as needed
+grouping_vars <- c("species")  # adjust as needed
 
 # Different palettes for each variable
 palette_list <- list(
@@ -692,7 +732,7 @@ for (var in grouping_vars) {
     # Subset counts
     subset_counts <- genome_counts_test[, colnames(genome_counts_test) %in% subset_meta$sample]
     
-    # Recompute hillpair
+     # Recompute hillpair
     beta_sub <- subset_counts %>%
       filter(rowSums(. != 0, na.rm = TRUE) > 0) %>%
       select_if(~!all(. == 0)) %>%
@@ -743,14 +783,17 @@ ad <- adonis2(
 results_adonis[[paste(var, i, sep = "_")]] <- ad
   
     combo_label <- paste0(combos[i, ], collapse = " and ")
-    plot_title  <- paste("Neutral Beta Diversity of", var, "controlling", combo_label) %>% 
+    plot_title  <- paste("Neutral Diversity of", var, "distal gut microbiome") %>% 
       str_wrap(width = 45) 
 
-    p <- ggplot(scores_df, aes(x = NMDS1, y = NMDS2, color = .data[[var]])) +
+    p <- ggplot(scores_df, aes(x = NMDS1, y = NMDS2, color = color)) +
       geom_point(size = 4) +
       stat_ellipse(type = "norm", linetype = 2) + 
       annotate("text", x = Inf, y = -Inf, label = paste0("R2 = ", round(ad$R2[1], 3), " p = ", signif(ad$p.value[1], 3)), hjust = 1.1, vjust = -0.5, size = 4) + 
-      scale_color_manual(values = palette_list[[var]]) +
+      scale_color_identity(guide = "legend",
+       name = "Host Species",
+       labels = unique(scores_df$species),   # replace with your real column
+       breaks = unique(scores_df$color)) +
       geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
       theme(
         axis.title = element_text(size = 12, face = "bold"),
@@ -767,7 +810,7 @@ results_adonis[[paste(var, i, sep = "_")]] <- ad
     
     # Save
     fixed_text <- paste(combos, collapse = "_")
-   filename <- paste0("Figures/SubsettedData/BetaDiv2subsets/", "Neutral_", var, "_", 
+   filename <- paste0("Figures/SubsettedData/BetaDiv2subsets/", "NeutralDiv_", var, 
                    paste0(combos[i, ], collapse = "_"), ".png")
    filename <- gsub(" ", "_", filename)
     ggsave(filename, plot = p, width = 6, height = 5, dpi = 300)
@@ -782,13 +825,20 @@ taxonomic_adonis <- bind_rows(results_adonis)
 betadisper_results
 taxonomic_adonis
 
-
 ```
 
-### Phylogenetic Beta Diversity (No Sex, Metadata fixed)
-``` {r phylogenetic_beta_no_sex, warning=FALSE, comments="", message=FALSE}
-# Example metadata and counts
-metadata_test <- sample_metadata 
+### Phylogenetic Beta Diversity (All species)
+``` {r phylogenetic_all_species, warning=FALSE, comments="", message=FALSE}
+metadata_test <- sample_metadata[which(sample_metadata$sample_type == "Colon contents" | sample_metadata$sample_type == "Faecal" & sample_metadata$species != "Perisoreus infaustus"),]
+metadata_test = metadata_test %>%
+  mutate(color = case_when(
+    species == "Cathartes aura" ~ "#d83034", 
+    species == "Coragyps atratus" ~ "#0d0d0d", 
+    species == "Canis familiaris" ~ "#bdd373", 
+    species == "Perisoreus infaustus" ~ "#003a7d", 
+    species == "Psittacula echo" ~ "#aa89e3", 
+    species == "Trichosurus vulpecula" ~ "#cc0099"
+  ))
 
 genome_counts_test <- genome_counts_filt %>%
   column_to_rownames(var = "genome")
@@ -797,7 +847,7 @@ genome_counts_test <- genome_counts_filt %>%
 genome_counts_test <- genome_counts_test[, colnames(genome_counts_test) %in% metadata_test$sample]
 
 # Metadata columns to test (must each have exactly 2 unique values)
-grouping_vars <- c("species", "sample_type")  # adjust as needed
+grouping_vars <- c("species")  # adjust as needed
 
 # Different palettes for each variable
 palette_list <- list(
@@ -829,7 +879,7 @@ for (var in grouping_vars) {
     # Subset counts
     subset_counts <- genome_counts_test[, colnames(genome_counts_test) %in% subset_meta$sample]
     
-    # Recompute hillpair
+      # Recompute hillpair
     beta_sub <- subset_counts %>%
   hillpair(., q = 1, tree = genome_tree)
     
@@ -878,14 +928,17 @@ ad <- adonis2(
 results_adonis[[paste(var, i, sep = "_")]] <- ad
   
     combo_label <- paste0(combos[i, ], collapse = " and ")
-    plot_title  <- paste("Phylogenetic Beta Diversity of", var, "controlling", combo_label) %>% 
+    plot_title  <- paste("Phylogenetic Diversity of", var, "distal gut microbiome") %>% 
       str_wrap(width = 45) 
 
-    p <- ggplot(scores_df, aes(x = NMDS1, y = NMDS2, color = .data[[var]])) +
+    p <- ggplot(scores_df, aes(x = NMDS1, y = NMDS2, color = color)) +
       geom_point(size = 4) +
       stat_ellipse(type = "norm", linetype = 2) + 
       annotate("text", x = Inf, y = -Inf, label = paste0("R2 = ", round(ad$R2[1], 3), " p = ", signif(ad$p.value[1], 3)), hjust = 1.1, vjust = -0.5, size = 4) + 
-      scale_color_manual(values = palette_list[[var]]) +
+      scale_color_identity(guide = "legend",
+       name = "Host Species",
+       labels = unique(scores_df$species),   
+       breaks = unique(scores_df$color)) +
       geom_segment(aes(x = x_cen, y = y_cen, xend = NMDS1, yend = NMDS2), alpha = 0.9) +
       theme(
         axis.title = element_text(size = 12, face = "bold"),
@@ -902,7 +955,7 @@ results_adonis[[paste(var, i, sep = "_")]] <- ad
     
     # Save
     fixed_text <- paste(combos, collapse = "_")
-   filename <- paste0("Figures/SubsettedData/BetaDiv2subsets/", "Phylogenetic_", var, "_", 
+   filename <- paste0("Figures/SubsettedData/BetaDiv2subsets/", "PhylogeneticDiv_", var, 
                    paste0(combos[i, ], collapse = "_"), ".png")
    filename <- gsub(" ", "_", filename)
     ggsave(filename, plot = p, width = 6, height = 5, dpi = 300)
@@ -916,8 +969,6 @@ taxonomic_adonis <- bind_rows(results_adonis)
 # Inspect results
 betadisper_results
 taxonomic_adonis
-
-
 ```
 
 

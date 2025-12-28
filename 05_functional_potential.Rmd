@@ -69,13 +69,156 @@ as.data.frame(GIFTs_elements_community_no0) %>%
         geom_tile(colour="white", linewidth=0.2)+
         scale_fill_gradientn(colours=rev(c("#2066a8", "#ededed"))) + 
         #facet_nested(~ species + sample_type,  scales="free", space="free") + 
-        facet_grid(functionid ~ sample_type, scales="free",space="free") +
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-              strip.text.y = element_text(angle = 0), axis.text.y = element_text(angle=45, size=5)) + 
+        facet_grid(functionid ~ species, scales="free",space="free") +
+        theme(strip.text.x = element_text(angle = 0, size = 5), 
+              axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+              strip.text.y = element_text(angle = 0, size = 5), 
+              axis.text.y = element_text(angle=45, size=5)) + 
         labs(y="Functional Attribute",x="Samples",fill="GIFT")
 
 
 ```
+### GIFT Comparative Test (Species)
+```{r community_elem_species, comment="", message=FALSE, warning=FALSE, fig.height=6, fig.width=8, fig.fullwidth=TRUE}
+element_gift <- GIFTs_elements_community_no0 %>% 
+  as.data.frame() %>% 
+  rownames_to_column(., "sample") %>% 
+  #Change column number to column in sample_metadata to change comparison sample_type, species, etc
+  left_join(sample_metadata[c(1,3)], by="sample")
+
+uniqueGIFT_db<- unique(GIFT_db2) %>% unite("Function",Function:Element, sep= "_", remove=FALSE)
+uniqueGIFT_db$DomainSplit = sub("_.*", "", uniqueGIFT_db$Function)
+
+Domains <- unique(uniqueGIFT_db$DomainSplit)
+Domain_colors <- setNames(viridis(length(Domains), option = "plasma"), Domains)
+
+element_gift$one_vs_all <- ifelse(element_gift$species == "Cathartes aura", "Cathartes aura", "Other")
+element_gift$one_vs_all <- factor(element_gift$one_vs_all)
+
+
+
+gift_long <- element_gift %>%
+  pivot_longer(
+    cols = starts_with(c("B0", "B1", "D0", "S0")),
+    names_to = "trait",
+    values_to = "value"
+  )
+
+gift_long$Element = uniqueGIFT_db$Element[match(gift_long$trait, uniqueGIFT_db$Code_element)]
+gift_long$Domain = uniqueGIFT_db$DomainSplit[match(gift_long$trait, uniqueGIFT_db$Code_element)]
+
+gift_long$one_vs_all <- ifelse(gift_long$species == "Cathartes aura",
+                             "Cathartes aura", "Other")
+
+gift_long <- gift_long %>%
+  mutate(one_vs_all = factor(one_vs_all))
+
+problem_traits <- gift_long %>%
+  filter(!is.na(value)) %>%
+  group_by(trait, one_vs_all) %>%
+  summarise(
+    n = n(),
+    n_unique = n_distinct(value),
+    .groups = "drop"
+  )
+
+valid_traits <- problem_traits %>%
+  filter(n >= 2, n_unique >= 2) %>%
+  count(trait) %>%
+  filter(n == 2) %>%      # both groups
+  pull(trait)
+
+gift_long_filt <- gift_long %>%
+  filter(trait %in% valid_traits)
+
+gift_mat <- element_gift %>%
+  select(starts_with(c("B0", "B1", "D0", "S0"))) %>%
+  as.matrix()
+
+adonis2(
+  gift_mat ~ one_vs_all,
+  data = element_gift,
+  method = "euclidean",
+  permutations = 9999
+)
+
+betadisper(dist(gift_mat), element_gift$one_vs_all)
+
+trait_tests <- gift_long_filt %>%
+  group_by(trait) %>%
+  summarise(
+     p = as.numeric(
+      pvalue(
+        oneway_test(
+          value ~ one_vs_all,
+          data = cur_data(),
+          distribution = approximate(nresample = 9999)
+        )
+      )
+    ),
+    .groups = "drop"
+  ) %>%
+  mutate(p_adj = p.adjust(p, method = "fdr"))
+
+effects <- gift_long_filt %>%
+  group_by(trait) %>%
+  summarise(
+    mean_diff =
+      mean(value[one_vs_all == "Cathartes aura"]) -
+      mean(value[one_vs_all == "Other"])
+  )
+
+results <- left_join(trait_tests, effects, by = "trait")
+results <- df_long_filt %>%
+  group_by(trait) %>%
+  summarise(
+    mean_diff = mean(value[one_vs_all == "Vulture_A"]) - mean(value[one_vs_all == "Other"]),
+    mean_value = mean(value),   # add this for color mapping
+    p_adj = ... # your adjusted p-value
+  )
+
+ggplot(results, aes(x = mean_diff, y = -log10(p_adj))) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  theme_bw()
+
+ggplot(results, aes(x = mean_diff, y = -log10(p_adj))) +
+    geom_point(aes(color = gift_long_filt$Domain), alpha = 0.7, size = 2) +
+    geom_text_repel(aes(label = Element), size = 3, max.overlaps = 10) +
+    theme_minimal() +
+    theme(
+      panel.background = element_rect(fill = "white", color = NA),
+      plot.background = element_rect(fill = "white", color = NA)
+    ) +
+    labs(
+      title = paste("Volcano Plot"),
+      x = "GIFT Difference",
+      y = "-Log10(Adjusted P-value)",
+      color = "Functional Domain"
+    ) + scale_color_manual(values = Domain_colors) +
+    theme(plot.title = element_text(hjust = 0.5))
+
+
+sig_traits <- results %>% filter(p_adj < 0.05) %>% pull(trait)
+
+ggplot(gift_long_filt %>% filter(trait %in% sig_traits),
+       aes(x = trait, y = sample, fill = value)) +
+  geom_tile() +
+  facet_wrap(~ one_vs_all, scales = "free_y") +
+  scale_fill_gradient(
+    name = "GIFT Score",
+    low = "white",      
+    high = "steelblue"  
+  )
+
+gift_long_filt %>%
+  filter(trait %in% sig_traits) %>%
+  ggplot(aes(trait, sample, fill = value)) +
+  geom_tile() +
+  facet_wrap(~ one_vs_all, scales = "free_y")
+
+```
+
 ### GIFT Wilcoxon Comparison (Species)
 ```{r community_elem_species, comment="", message=FALSE, warning=FALSE, fig.height=6, fig.width=8, fig.fullwidth=TRUE}
 element_gift <- GIFTs_elements_community_no0 %>% 
@@ -227,10 +370,20 @@ ggplot(heatmap_data, aes(x=sample, y=paste0(trait, " ", sig_wilcox_sample$p_labe
 
 ``` {r Function_Matrix_All_Pairwise}
 GIFTs_test = GIFTs_elements_community_no0
-metadata_test = sample_metadata
+metadata_test <- sample_metadata[which(sample_metadata$sample_type == "Colon contents" | sample_metadata$sample_type == "Faecal"),]
+metadata_test = metadata_test %>%
+  mutate(color = case_when(
+    species == "Cathartes aura" ~ "#d83034", 
+    species == "Coragyps atratus" ~ "#0d0d0d", 
+    species == "Canis familiaris" ~ "#bdd373", 
+    species == "Perisoreus infaustus" ~ "#003a7d", 
+    species == "Psittacula echo" ~ "#aa89e3", 
+    species == "Trichosurus vulpecula" ~ "#cc0099"
+  ))
 
-# Metadata variables you want to test
-vars <- c("species", "sample_type")
+
+# Metadata variables to test
+vars <- c("sample_type")
 
 palette_list <- list(
   species = species_colors,
@@ -250,16 +403,10 @@ for (var in vars) {
   # All combinations of other vars
   combos <- unique(metadata_test[other_vars])
   
-  for (i in seq_len(nrow(combos))) {
-    combo <- combos[i, , drop = FALSE]
-    
-    # Subset metadata based on fixed values
-    subset_meta <- metadata_test %>%
-      filter(across(all_of(other_vars), ~ .x == combo[[cur_column()]]))
     
     # Match GIFT samples to metadata
-    subset_gift <- GIFTs_test[rownames(GIFTs_test) %in% subset_meta$sample, ]
-    subset_meta <- subset_meta[match(rownames(subset_gift), subset_meta$sample), ]
+    subset_gift <- GIFTs_test[rownames(GIFTs_test) %in% metadata_test$sample, ]
+    subset_meta <- metadata_test[match(rownames(subset_gift), metadata_test$sample), ]
     
     # Skip if not enough samples
     if (nrow(subset_meta) < 4 || length(unique(subset_meta[[var]])) < 2) next
@@ -276,30 +423,29 @@ for (var in vars) {
       by = "margin"
     )
     ad_df <- broom::tidy(ad) %>%
-      mutate(variable = var,
-             fixed = paste(paste0(combo), collapse = ", "))
-    results_adonis[[paste(var, i, sep = "_")]] <- ad_df
+      mutate(variable = var)
+    results_adonis[[paste(var)]] <- ad_df
     
     ## --- Betadisper ---
     bd <- betadisper(dist_func, subset_meta[[var]])
     bd_perm <- permutest(bd)
     bd_df <- data.frame(
       variable = var,
-      fixed = paste(paste0(names(combo), "=", combo), collapse = ", "),
       F_value = bd_perm$tab[1, "F"],
       P_value = bd_perm$tab[1, "Pr(>F)"]
     )
-    results_betadisper[[paste(var, i, sep = "_")]] <- bd_df
+    results_betadisper[[paste(var)]] <- bd_df
     
     ## --- NMDS Plot ---
     set.seed(123)
     nmds_result <- metaMDS(dist_func, k = 2, trymax = 100)
     nmds_scores <- as.data.frame(nmds_result$points)
-    nmds_scores[[var]] <- subset_meta[[var]]
+    nmds_scores <- rownames_to_column(nmds_scores, "sample")
+    nmds_scores <- left_join(nmds_scores, subset_meta, by="sample")
+    nmds_scores <- column_to_rownames(nmds_scores, "sample")
     
     # Title with wrapping
-    title_text <- paste0("GIFTs of ", var, " with ", 
-                         paste(paste0(names(combo), "=", combo), collapse = ", "))
+    title_text <- paste0("GIFTs of ", var)
     
    # Pick correct palette
 palette <- palette_list[[var]]
@@ -314,15 +460,18 @@ centroids <- nmds_scores %>%
 nmds_scores <- nmds_scores %>%
   left_join(centroids, by = var)
 
-  combo_label <- paste0(combos[i, ], collapse = " and ")
-  plot_title  <- paste("GIFT Diversity of", var, "controlling", combo_label) %>% 
+  
+  plot_title  <- paste("GIFT Diversity of", var) %>% 
     str_wrap(width = 45) 
 
-p <- ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = !!sym(var))) +
+p <- ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = color)) +
   geom_point(size = 4) +
   stat_ellipse(type = "norm", linetype = 2) + 
-      annotate("text", x = Inf, y = -Inf, label = paste0("p = ", signif(ad_df$p.value[1], 3)), hjust = 1.1, vjust = -0.5, size = 4) + 
-  scale_color_manual(values = palette) +
+      annotate("text", x = Inf, y = -Inf, label = paste0("R2 = ", round(ad_df$R2[1], 3), "p = ", signif(ad_df$p.value[1], 3)), hjust = 1.1, vjust = -0.5, size = 4) + 
+  scale_color_identity(guide = "legend",
+       name = "Host Species",
+       labels = unique(scores_df$species),   
+       breaks = unique(scores_df$color)) +
   theme(
         axis.title = element_text(size = 12, face = "bold"),
         axis.text = element_text(size = 10),
@@ -335,13 +484,11 @@ p <- ggplot(nmds_scores, aes(x = MDS1, y = MDS2, color = !!sym(var))) +
   labs(title = str_wrap(plot_title, width = 45),
        color = var)
     
-fixed_text <- paste(combo, collapse = "_")
-filename <- paste0("Figures/SubsettedData/GIFTNMDS/", "GIFTs_", var, "_", fixed_text, ".png")
+filename <- paste0("Figures/SubsettedData/GIFTNMDS/", "GIFTs_", var, ".png")
 filename <- gsub(" ", "_", filename)
 
     ggsave(filename, plot = p, width = 6, height = 5, dpi = 300)    
   }
-}
 
 # Bind results
 functional_adonis <- bind_rows(results_adonis)

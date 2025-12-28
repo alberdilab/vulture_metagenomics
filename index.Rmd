@@ -87,5 +87,6 @@ library(lme4)
 library(FSA)
 library(broom)
 library(emmeans)
+library(coin)
 
 ```
